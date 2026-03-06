@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Card, Select, Space, Table, Typography } from "antd";
+import { Alert, Button, Card, Select, Space, Table, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
@@ -18,6 +18,7 @@ export default function EditorWorkbenchPage() {
   const [list, setList] = useState<EditorManuscriptItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>("");
 
@@ -29,6 +30,7 @@ export default function EditorWorkbenchPage() {
     }
     (async () => {
       setLoading(true);
+      setLoadError(null);
       try {
         const res = await editorApi.manuscripts({
           page,
@@ -37,8 +39,9 @@ export default function EditorWorkbenchPage() {
         });
         setList(res.items);
         setTotal(res.total);
-      } catch {
+      } catch (e) {
         setList([]);
+        setLoadError(e instanceof Error ? e.message : "加载失败，请刷新重试");
       } finally {
         setLoading(false);
       }
@@ -107,6 +110,9 @@ export default function EditorWorkbenchPage() {
             </Space>
           }
         >
+          {loadError && (
+            <Alert message={loadError} type="warning" showIcon className="mb-4" action={<Button size="small" onClick={() => window.location.reload()}>刷新</Button>} />
+          )}
           <Table<EditorManuscriptItem>
             rowKey="id"
             columns={columns}
@@ -119,6 +125,9 @@ export default function EditorWorkbenchPage() {
               showSizeChanger: false,
               showTotal: (t) => `共 ${t} 条`,
               onChange: setPage,
+            }}
+            locale={{
+              emptyText: "暂无稿件",
             }}
           />
         </Card>

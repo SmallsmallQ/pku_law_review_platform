@@ -1,0 +1,188 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Button, Card, Form, Input, Modal, Select, Space, Table, Tag, message } from "antd";
+import type { ColumnsType } from "antd/es/table";
+import { adminApi, type AdminUserItem } from "@/services/api";
+
+const ROLE_MAP: Record<string, string> = { author: "作者", editor: "编辑", admin: "管理员" };
+const pageSize = 20;
+
+export default function AdminUsersPage() {
+  const [list, setList] = useState<AdminUserItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [roleFilter, setRoleFilter] = useState<string>("");
+  const [activeFilter, setActiveFilter] = useState<string>("");
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<AdminUserItem | null>(null);
+  const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
+  const [submitting, setSubmitting] = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    adminApi
+      .users({
+        page,
+        page_size: pageSize,
+        ...(roleFilter ? { role: roleFilter } : {}),
+        ...(activeFilter !== "" ? { is_active: activeFilter === "true" } : {}),
+      })
+      .then((res) => {
+        setList(res.items);
+        setTotal(res.total);
+      })
+      .catch(() => setList([]))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => load(), [page, roleFilter, activeFilter]);
+
+  const handleCreate = (values: { email: string; password: string; real_name?: string; role: string }) => {
+    setSubmitting(true);
+    adminApi
+      .createUser(values)
+      .then(() => {
+        message.success("创建成功");
+        setCreateModalOpen(false);
+        form.resetFields();
+        load();
+      })
+      .catch((e) => message.error(e?.message || "创建失败"))
+      .finally(() => setSubmitting(false));
+  };
+
+  const handleUpdate = (values: { real_name?: string; role?: string; is_active?: boolean }) => {
+    if (!editingUser) return;
+    setSubmitting(true);
+    adminApi
+      .updateUser(editingUser.id, values)
+      .then(() => {
+        message.success("更新成功");
+        setEditModalOpen(false);
+        setEditingUser(null);
+        editForm.resetFields();
+        load();
+      })
+      .catch((e) => message.error(e?.message || "更新失败"))
+      .finally(() => setSubmitting(false));
+  };
+
+  const columns: ColumnsType<AdminUserItem> = [
+    { title: "ID", dataIndex: "id", key: "id", width: 80 },
+    { title: "邮箱", dataIndex: "email", key: "email" },
+    { title: "姓名", dataIndex: "real_name", key: "real_name" },
+    {
+      title: "角色",
+      dataIndex: "role",
+      key: "role",
+      width: 90,
+      render: (r: string) => <Tag color={r === "admin" ? "red" : r === "editor" ? "blue" : "default"}>{ROLE_MAP[r] ?? r}</Tag>,
+    },
+    {
+      title: "状态",
+      dataIndex: "is_active",
+      key: "is_active",
+      width: 80,
+      render: (v: boolean) => (v ? <Tag color="green">启用</Tag> : <Tag color="default">停用</Tag>),
+    },
+    { title: "创建时间", dataIndex: "created_at", key: "created_at", width: 180, render: (v: string) => v?.slice(0, 19) ?? "" },
+    {
+      title: "操作",
+      key: "action",
+      width: 80,
+      render: (_, record) => (
+        <Button type="link" size="small" onClick={() => { setEditingUser(record); editForm.setFieldsValue({ real_name: record.real_name, role: record.role, is_active: record.is_active }); setEditModalOpen(true); }}>
+          编辑
+        </Button>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <h1 className="text-xl font-bold text-[#333] mb-4">用户管理</h1>
+      <Card size="small" className="mb-4">
+        <Space wrap>
+          <Select placeholder="角色" allowClear value={roleFilter || undefined} onChange={setRoleFilter} style={{ width: 100 }}>
+            <Select.Option value="author">作者</Select.Option>
+            <Select.Option value="editor">编辑</Select.Option>
+            <Select.Option value="admin">管理员</Select.Option>
+          </Select>
+          <Select placeholder="状态" allowClear value={activeFilter || undefined} onChange={setActiveFilter} style={{ width: 100 }}>
+            <Select.Option value="true">启用</Select.Option>
+            <Select.Option value="false">停用</Select.Option>
+          </Select>
+          <Button type="primary" onClick={() => setCreateModalOpen(true)} className="!bg-[#8B1538] hover:!bg-[#70122e]">
+            新建用户
+          </Button>
+        </Space>
+      </Card>
+      <Table
+        rowKey="id"
+        columns={columns}
+        dataSource={list}
+        loading={loading}
+        pagination={{ current: page, pageSize, total, onChange: setPage }}
+        size="small"
+      />
+
+      <Modal title="新建用户" open={createModalOpen} onCancel={() => setCreateModalOpen(false)} footer={null} destroyOnClose>
+        <Form form={form} layout="vertical" onFinish={handleCreate}>
+          <Form.Item name="email" label="邮箱" rules={[{ required: true }, { type: "email" }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="password" label="密码" rules={[{ required: true, min: 6 }]}>
+            <Input.Password />
+          </Form.Item>
+          <Form.Item name="real_name" label="姓名">
+            <Input />
+          </Form.Item>
+          <Form.Item name="role" label="角色" initialValue="author" rules={[{ required: true }]}>
+            <Select>
+              <Select.Option value="author">作者</Select.Option>
+              <Select.Option value="editor">编辑</Select.Option>
+              <Select.Option value="admin">管理员</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit" loading={submitting} className="!bg-[#8B1538] hover:!bg-[#70122e]">创建</Button>
+              <Button onClick={() => setCreateModalOpen(false)}>取消</Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal title="编辑用户" open={editModalOpen} onCancel={() => { setEditModalOpen(false); setEditingUser(null); }} footer={null} destroyOnClose>
+        <Form form={editForm} layout="vertical" onFinish={handleUpdate}>
+          <Form.Item name="real_name" label="姓名">
+            <Input />
+          </Form.Item>
+          <Form.Item name="role" label="角色" rules={[{ required: true }]}>
+            <Select>
+              <Select.Option value="author">作者</Select.Option>
+              <Select.Option value="editor">编辑</Select.Option>
+              <Select.Option value="admin">管理员</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="is_active" label="状态">
+            <Select>
+              <Select.Option value={true}>启用</Select.Option>
+              <Select.Option value={false}>停用</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit" loading={submitting} className="!bg-[#8B1538] hover:!bg-[#70122e]">保存</Button>
+              <Button onClick={() => setEditModalOpen(false)}>取消</Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  );
+}

@@ -5,6 +5,8 @@ from app.models.user import User
 from app.models.section import Section
 from app.models.manuscript import Manuscript, ManuscriptVersion
 from app.models.editor_action import EditorAction
+from app.models.revision_template import RevisionTemplate
+from app.models.system_config import SystemConfig
 
 __all__ = [
     "User",
@@ -12,4 +14,6 @@ __all__ = [
     "Manuscript",
     "ManuscriptVersion",
     "EditorAction",
+    "RevisionTemplate",
+    "SystemConfig",
 ]

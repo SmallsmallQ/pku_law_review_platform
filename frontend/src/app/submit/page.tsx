@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Button, Card, Checkbox, Form, Input, Typography, Upload } from "antd";
+import { Alert, Button, Card, Checkbox, Form, Input, Typography, Upload } from "antd";
 import type { UploadFile } from "antd";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
@@ -104,7 +105,16 @@ export default function SubmitPage() {
             <Form.Item name="contact" label="联系方式">
               <Input placeholder="邮箱或电话" />
             </Form.Item>
-            <Form.Item label={COPYRIGHT_AGREEMENT_TITLE}>
+            <Form.Item
+              label={
+                <span className="flex items-center gap-2">
+                  {COPYRIGHT_AGREEMENT_TITLE}
+                  <Link href="/copyright" target="_blank" className="text-sm font-normal text-[#8B1538] hover:underline">
+                    查看完整协议
+                  </Link>
+                </span>
+              }
+            >
               <div className="max-h-48 overflow-y-auto rounded border border-[#d9d9d9] bg-[#f9f8f5] px-4 py-3 text-sm text-[#333]">
                 {COPYRIGHT_AGREEMENT_PARAGRAPHS.map((p, i) => (
                   <p key={i} className={i > 0 ? "mt-3" : ""}>
@@ -154,7 +164,7 @@ export default function SubmitPage() {
               </Upload>
             </Form.Item>
             {error && (
-              <div className="mb-4 text-sm text-red-600">{error}</div>
+              <Alert message={error} type="error" showIcon className="mb-4" />
             )}
             <Form.Item>
               <Button type="primary" htmlType="submit" loading={loading} size="large">

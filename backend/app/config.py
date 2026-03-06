@@ -10,8 +10,10 @@ class Settings(BaseSettings):
     app_name: str = "中外法学智能编审系统"
     debug: bool = False
 
-    # 数据库（初版用同步驱动，便于 SQLAlchemy 与迁移）
-    database_url: str = "postgresql://user:pass@localhost:5432/law_review"
+    # 数据库。默认 SQLite 便于本地无 PostgreSQL 时直接跑通；生产请设 DATABASE_URL 为 PostgreSQL
+    database_url: str = "sqlite:///./law_review.db"
+    # 设为 true 时强制使用 SQLite（忽略 DATABASE_URL），便于本地未启 PostgreSQL 时跑通
+    use_sqlite: bool = False
 
     # 认证（初版 JWT）
     secret_key: str = "change-me-in-production"

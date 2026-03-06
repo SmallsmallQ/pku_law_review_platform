@@ -21,6 +21,7 @@ export default function AuthorCenterPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export default function AuthorCenterPage() {
     }
     (async () => {
       setLoading(true);
+      setLoadError(null);
       try {
         const res = await manuscriptsApi.my({
           page,
@@ -46,8 +48,9 @@ export default function AuthorCenterPage() {
         });
         setList(res.items);
         setTotal(res.total);
-      } catch {
+      } catch (e) {
         setList([]);
+        setLoadError(e instanceof Error ? e.message : "加载失败，请刷新重试");
       } finally {
         setLoading(false);
       }
@@ -123,6 +126,9 @@ export default function AuthorCenterPage() {
         >
           {successMessage && (
             <Alert message={successMessage} type="success" showIcon className="mb-4" />
+          )}
+          {loadError && (
+            <Alert message={loadError} type="warning" showIcon className="mb-4" action={<Button size="small" onClick={() => window.location.reload()}>刷新</Button>} />
           )}
           <Table<ManuscriptListItem>
             rowKey="id"

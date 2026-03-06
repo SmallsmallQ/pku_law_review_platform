@@ -7,6 +7,10 @@ from openai import OpenAI
 from app.config import settings
 
 
+# 请求超时（秒），避免长时间无响应
+LLM_REQUEST_TIMEOUT = 90
+
+
 def _client() -> OpenAI | None:
     """返回配置好的 OpenAI 兼容客户端；未配置 API Key 时返回 None。"""
     if not (getattr(settings, "dashscope_api_key", None) or "").strip():
@@ -14,6 +18,7 @@ def _client() -> OpenAI | None:
     return OpenAI(
         api_key=settings.dashscope_api_key.strip(),
         base_url=settings.llm_base_url.strip() or "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        timeout=LLM_REQUEST_TIMEOUT,
     )
 
 
@@ -31,11 +36,17 @@ def chat_completion(
     if client is None:
         raise ValueError("未配置 DASHSCOPE_API_KEY，请在 .env 中设置阿里云百炼 API Key")
     model = (model or "").strip() or settings.llm_model
-    completion = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        max_tokens=max_tokens,
-    )
+    try:
+        completion = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=max_tokens,
+        )
+    except Exception as e:
+        err_msg = str(e).strip() or "大模型调用异常"
+        if "timeout" in err_msg.lower() or "timed out" in err_msg.lower():
+            raise ValueError("请求超时，请稍后重试") from e
+        raise ValueError(err_msg) from e
     choice = completion.choices[0] if completion.choices else None
     if not choice or not choice.message:
         return ""

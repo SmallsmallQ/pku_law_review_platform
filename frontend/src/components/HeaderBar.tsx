@@ -7,15 +7,20 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const { Header } = Layout;
 
-const navItems = [
-  { key: "/", label: <Link href="/">首页</Link> },
-  { key: "/submit", label: <Link href="/submit">投稿入口</Link> },
-  { key: "/author", label: <Link href="/author">作者中心</Link> },
-  { key: "/editor", label: <Link href="/editor">编辑工作台</Link> },
-];
+function getNavItems(isAdmin: boolean) {
+  const items = [
+    { key: "/", label: <Link href="/">首页</Link> },
+    { key: "/submit", label: <Link href="/submit">投稿入口</Link> },
+    { key: "/author", label: <Link href="/author">作者中心</Link> },
+    { key: "/editor", label: <Link href="/editor">编辑工作台</Link> },
+  ];
+  if (isAdmin) items.push({ key: "/admin", label: <Link href="/admin">管理后台</Link> });
+  return items;
+}
 
 function getSelectedKey(pathname: string) {
   if (pathname === "/") return "/";
+  if (pathname.startsWith("/admin")) return "/admin";
   if (pathname.startsWith("/author")) return "/author";
   if (pathname.startsWith("/editor")) return "/editor";
   if (pathname.startsWith("/submit")) return "/submit";
@@ -26,13 +31,14 @@ export default function HeaderBar() {
   const { user, loading, logout } = useAuth();
   const pathname = usePathname();
   const selectedKey = getSelectedKey(pathname);
+  const navItems = getNavItems(user?.role === "admin");
 
   return (
     <Header className="!bg-white !px-0 !py-0 h-auto">
       {/* 顶栏 */}
       <div className="border-b border-[#ebeae6] bg-[#f9f8f5]">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-end gap-4 px-4 py-2">
-          <Input placeholder="站内搜索" allowClear className="mr-auto w-40 max-w-full sm:w-48" />
+          <Input placeholder="站内搜索" allowClear className="mr-auto w-40 max-w-full sm:w-48" aria-label="站内搜索" />
           <a
             href="https://www.law.pku.edu.cn/"
             target="_blank"

@@ -134,3 +134,104 @@ export const aiApi = {
       body: JSON.stringify(body),
     }),
 };
+
+// ---------- 管理后台（仅 admin） ----------
+export interface AdminUserItem {
+  id: number;
+  email: string;
+  real_name: string | null;
+  role: string;
+  institution: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface SectionItem {
+  id: number;
+  name: string;
+  code: string | null;
+  sort_order: number;
+  created_at: string | null;
+}
+
+export interface RevisionTemplateItem {
+  id: number;
+  name: string | null;
+  content: string | null;
+  is_active: boolean;
+  created_at: string | null;
+}
+
+export interface ConfigItem {
+  key: string;
+  value: string | null;
+  updated_at: string | null;
+}
+
+export interface AdminStats {
+  manuscripts_total: number;
+  manuscripts_by_status: Record<string, number>;
+  manuscripts_pending: number;
+  users_by_role: Record<string, number>;
+  sections_count: number;
+  templates_count: number;
+}
+
+export const adminApi = {
+  users: (params?: { role?: string; is_active?: boolean; page?: number; page_size?: number }) =>
+    request<{ items: AdminUserItem[]; total: number }>("admin/users", {
+      params: params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])) : undefined,
+    }),
+  createUser: (body: { email: string; password: string; real_name?: string; role?: string }) =>
+    request<AdminUserItem>("admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  updateUser: (id: number, body: { real_name?: string; role?: string; is_active?: boolean }) =>
+    request<AdminUserItem>(`admin/users/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+
+  sections: () => request<{ items: SectionItem[]; total: number }>("admin/sections"),
+  createSection: (body: { name: string; code?: string; sort_order?: number }) =>
+    request<SectionItem>("admin/sections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  updateSection: (id: number, body: { name: string; code?: string; sort_order?: number }) =>
+    request<SectionItem>(`admin/sections/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  deleteSection: (id: number) =>
+    request<void>(`admin/sections/${id}`, { method: "DELETE" }),
+
+  revisionTemplates: () => request<{ items: RevisionTemplateItem[]; total: number }>("admin/templates/revision"),
+  createRevisionTemplate: (body: { name?: string; content?: string; is_active?: boolean }) =>
+    request<RevisionTemplateItem>("admin/templates/revision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  updateRevisionTemplate: (id: number, body: { name?: string; content?: string; is_active?: boolean }) =>
+    request<RevisionTemplateItem>(`admin/templates/revision/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+
+  config: () => request<{ items: ConfigItem[]; total: number }>("admin/config"),
+  updateConfig: (body: { key?: string; value?: string; items?: { key: string; value: string }[] }) =>
+    request<{ message: string }>("admin/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+
+  stats: () => request<AdminStats>("admin/stats"),
+};

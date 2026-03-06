@@ -2,9 +2,22 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  Alert,
+  Breadcrumb,
+  Button,
+  Card,
+  Descriptions,
+  List,
+  Modal,
+  Space,
+  Spin,
+  Tag,
+  Typography,
+} from "antd";
+import type { BreadcrumbItemType } from "antd/es/breadcrumb/Breadcrumb";
 import { useAuth } from "@/contexts/AuthContext";
-import Breadcrumb from "@/components/Breadcrumb";
 import HeaderBar from "@/components/HeaderBar";
 import { STATUS_MAP } from "@/lib/constants";
 import { editorApi } from "@/services/api";
@@ -60,6 +73,14 @@ export default function EditorManuscriptDetailPage() {
     }
   };
 
+  const copyReport = useCallback(() => {
+    if (!aiReport?.content) return;
+    navigator.clipboard.writeText(aiReport.content).then(
+      () => setSuccessMessage("已复制到剪贴板"),
+      () => setAiError("复制失败"),
+    );
+  }, [aiReport?.content]);
+
   const runAction = async (actionType: string, comment?: string) => {
     if (!id) return;
     setActionLoading(true);
@@ -82,119 +103,162 @@ export default function EditorManuscriptDetailPage() {
 
   const manuscript = detail?.manuscript as Record<string, unknown> | undefined;
   const currentVersion = detail?.current_version as Record<string, unknown> | undefined;
-  const editorActions = (detail?.editor_actions as unknown[]) || [];
+  const editorActions = (detail?.editor_actions as Record<string, unknown>[]) || [];
   const status = manuscript?.status as string | undefined;
 
   if (!user || user.role === "author") return null;
 
+  const breadcrumbItems: BreadcrumbItemType[] = [
+    { title: <Link href="/">首页</Link> },
+    { title: <Link href="/editor">编辑工作台</Link> },
+    { title: "稿件详情" },
+  ];
+
   return (
-    <div className="min-h-screen bg-[#f9f8f5]">
+    <div className="min-h-screen bg-[#fafafa]">
       <HeaderBar />
-      <main className="mx-auto max-w-3xl px-6 py-8">
-        <div className="rounded-sm border border-[#ddd] bg-white p-6 shadow-sm">
-          <Breadcrumb items={[{ label: "首页", href: "/" }, { label: "编辑工作台", href: "/editor" }, { label: "稿件详情" }]} />
-          <h1 className="mb-6 text-lg font-semibold text-[#333]">稿件详情（编辑）</h1>
+      <main className="mx-auto max-w-3xl px-4 py-8">
+        <Card>
+          <Breadcrumb items={breadcrumbItems} className="mb-4" />
+          <Typography.Title level={5} className="!mb-4">
+            稿件详情（编辑）
+          </Typography.Title>
           {successMessage && (
-            <div className="mb-4 rounded bg-green-50 px-4 py-2 text-sm text-green-800">{successMessage}</div>
+            <Alert message={successMessage} type="success" showIcon className="mb-4" />
           )}
-          {loading && <p className="text-[#666]">加载中…</p>}
+          {loading && (
+            <div className="flex items-center gap-3 py-6">
+              <Spin />
+              <Typography.Text type="secondary">加载稿件信息…</Typography.Text>
+            </div>
+          )}
           {!loading && detail && manuscript && (
             <>
-              <dl className="space-y-2 border-b border-[#eee] pb-4">
-                <div><dt className="text-sm text-[#666]">稿件编号</dt><dd>{String(manuscript.manuscript_no)}</dd></div>
-                <div><dt className="text-sm text-[#666]">标题</dt><dd>{String(manuscript.title)}</dd></div>
-                <div><dt className="text-sm text-[#666]">状态</dt><dd><span className="rounded bg-[#eee] px-2 py-0.5 text-sm">{STATUS_MAP[status ?? ""] ?? status}</span></dd></div>
-                <div><dt className="text-sm text-[#666]">投稿人 ID</dt><dd>{String(manuscript.submitted_by)}</dd></div>
+              <Descriptions column={1} size="small" bordered className="mb-4">
+                <Descriptions.Item label="稿件编号">{String(manuscript.manuscript_no)}</Descriptions.Item>
+                <Descriptions.Item label="标题">{String(manuscript.title)}</Descriptions.Item>
+                <Descriptions.Item label="状态">
+                  <Tag color="default">{STATUS_MAP[status ?? ""] ?? status}</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="投稿人 ID">{String(manuscript.submitted_by)}</Descriptions.Item>
                 {currentVersion && (
-                  <div>
-                    <dt className="text-sm text-[#666]">当前版本</dt>
-                    <dd className="flex items-center gap-2">
-                      v{String(currentVersion.version_number)}，{String(currentVersion.file_name_original)}
-                      <a href={editorApi.downloadUrl(Number(id), Number(currentVersion.id))} target="_blank" rel="noopener noreferrer" className="text-sm text-[#8B1538] hover:underline">下载</a>
-                    </dd>
-                  </div>
+                  <Descriptions.Item label="当前版本">
+                    <Space>
+                      <span>v{String(currentVersion.version_number)}，{String(currentVersion.file_name_original)}</span>
+                      <a href={editorApi.downloadUrl(Number(id), Number(currentVersion.id))} target="_blank" rel="noopener noreferrer">
+                        下载
+                      </a>
+                    </Space>
+                  </Descriptions.Item>
                 )}
-              </dl>
-              <div className="mt-4">
-                <h2 className="mb-2 text-sm font-medium text-[#333]">操作</h2>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
+              </Descriptions>
+              <Card size="small" title="操作" className="mb-4">
+                {aiReviewLoading && (
+                  <Alert message="正在生成 AI 初审报告，预计需要 10–30 秒，请稍候。" type="info" showIcon className="mb-3" />
+                )}
+                <Space wrap>
+                  <Button
+                    type="primary"
+                    ghost
                     onClick={runAiReview}
-                    disabled={aiReviewLoading}
-                    className="rounded border border-[#8B1538] bg-[#8B1538]/10 px-3 py-1.5 text-sm text-[#8B1538] hover:bg-[#8B1538]/20 disabled:opacity-50"
+                    loading={aiReviewLoading}
                   >
                     {aiReviewLoading ? "生成中…" : "生成 AI 初审报告"}
-                  </button>
+                  </Button>
                   {status !== "revision_requested" && status !== "rejected" && status !== "accepted" && (
-                    <button type="button" onClick={() => setRevisionModalOpen(true)} className="rounded border border-[#ccc] px-3 py-1.5 text-sm hover:bg-[#f5f5f5]">退修</button>
+                    <Button onClick={() => setRevisionModalOpen(true)}>退修</Button>
                   )}
                   {status !== "rejected" && (
-                    <button type="button" onClick={() => setRejectConfirmOpen(true)} disabled={actionLoading} className="rounded border border-red-300 bg-red-50 px-3 py-1.5 text-sm text-red-700 hover:bg-red-100">退稿</button>
+                    <Button danger onClick={() => setRejectConfirmOpen(true)} disabled={actionLoading}>
+                      退稿
+                    </Button>
                   )}
                   {status !== "accepted" && (
-                    <button type="button" onClick={() => runAction("accept")} disabled={actionLoading} className="rounded bg-[#8B1538] px-3 py-1.5 text-sm text-white hover:bg-[#70122e]">录用</button>
+                    <Button type="primary" onClick={() => runAction("accept")} disabled={actionLoading}>
+                      录用
+                    </Button>
                   )}
-                </div>
-              </div>
+                </Space>
+              </Card>
               {aiError && (
-                <div className="mt-4 rounded border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{aiError}</div>
+                <Alert message={aiError} type="error" showIcon className="mb-4" />
               )}
               {aiReport && (
-                <div className="mt-6 rounded border border-[#eee] bg-[#f5f4f0] p-4">
-                  <h2 className="mb-2 text-sm font-medium text-[#333]">AI 初审报告</h2>
-                  <p className="mb-2 text-xs text-[#666]">模型：{aiReport.model}</p>
-                  <div className="max-h-[480px] overflow-y-auto rounded border border-[#eee] bg-white p-4 text-sm text-[#333] whitespace-pre-wrap font-sans">{aiReport.content}</div>
-                </div>
+                <Card
+                  size="small"
+                  title="AI 初审报告"
+                  className="mb-4"
+                  extra={
+                    <Button type="link" size="small" onClick={copyReport}>
+                      复制报告
+                    </Button>
+                  }
+                >
+                  <Typography.Text type="secondary" className="text-xs block mb-2">
+                    模型：{aiReport.model}
+                  </Typography.Text>
+                  <div className="max-h-[420px] overflow-y-auto rounded border border-[#f0f0f0] bg-[#fafafa] p-4 text-sm text-[#333] whitespace-pre-wrap">
+                    {aiReport.content}
+                  </div>
+                </Card>
               )}
               {editorActions.length > 0 && (
-                <div className="mt-6">
-                  <h2 className="mb-2 text-sm font-medium text-[#333]">操作记录</h2>
-                  {(editorActions as Record<string, unknown>[]).map((a, i) => (
-                    <div key={i} className="mb-2 rounded border border-[#eee] p-3 text-sm">
-                      <p>{String(a.action_type)}：{String(a.from_status)} → {String(a.to_status)}</p>
-                      {a.comment != null && <p className="mt-1 text-[#555]">{String(a.comment)}</p>}
-                      <p className="mt-1 text-xs text-[#666]">{String(a.created_at ?? "").slice(0, 19)}</p>
-                    </div>
-                  ))}
-                </div>
+                <Card size="small" title="操作记录" className="mb-4">
+                  <List
+                    size="small"
+                    dataSource={editorActions}
+                    renderItem={(a, i) => (
+                      <List.Item>
+                        <div>
+                          <p className="mb-0">{String(a.action_type)}：{String(a.from_status)} → {String(a.to_status)}</p>
+                          {a.comment != null && <Typography.Text type="secondary" className="block mt-1">{String(a.comment)}</Typography.Text>}
+                          <Typography.Text type="secondary" className="text-xs block mt-1">{String(a.created_at ?? "").slice(0, 19)}</Typography.Text>
+                        </div>
+                      </List.Item>
+                    )}
+                  />
+                </Card>
               )}
-              <p className="mt-6"><Link href="/editor" className="text-[#8B1538] hover:underline">返回列表</Link></p>
+              <Link href="/editor">
+                <Button type="link" className="!px-0">返回列表</Button>
+              </Link>
             </>
           )}
-        </div>
+        </Card>
       </main>
 
-      {revisionModalOpen && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-sm border border-[#ddd] bg-white p-6 shadow-lg">
-            <h2 className="mb-4 text-lg font-medium text-[#333]">退修意见</h2>
-            <textarea
-              placeholder="请输入退修意见"
-              value={revisionComment}
-              onChange={(e) => setRevisionComment(e.target.value)}
-              rows={5}
-              className="w-full rounded border border-[#ccc] px-3 py-2 text-[#333] focus:border-[#8B1538] focus:outline-none focus:ring-1 focus:ring-[#8B1538]"
-            />
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => { setRevisionModalOpen(false); setRevisionComment(""); }} className="rounded border border-[#ccc] px-3 py-1.5 text-sm hover:bg-[#f5f5f5]">取消</button>
-              <button type="button" onClick={() => runAction("revision_request", revisionComment)} disabled={actionLoading} className="rounded bg-[#8B1538] px-3 py-1.5 text-sm text-white hover:bg-[#70122e]">提交退修</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        title="退修意见"
+        open={revisionModalOpen}
+        onCancel={() => { setRevisionModalOpen(false); setRevisionComment(""); }}
+        onOk={() => runAction("revision_request", revisionComment)}
+        okText="提交退修"
+        cancelText="取消"
+        confirmLoading={actionLoading}
+        destroyOnClose
+      >
+        <Typography.Paragraph type="secondary" className="mb-2">请输入退修意见，将发送给作者。</Typography.Paragraph>
+        <textarea
+          placeholder="请输入退修意见"
+          value={revisionComment}
+          onChange={(e) => setRevisionComment(e.target.value)}
+          rows={5}
+          className="w-full rounded border border-[#d9d9d9] px-4 py-2 text-[#333] focus:border-[#8B1538] focus:outline-none focus:ring-1 focus:ring-[#8B1538]"
+        />
+      </Modal>
 
-      {rejectConfirmOpen && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm rounded-sm border border-[#ddd] bg-white p-6 shadow-lg">
-            <p className="mb-4 text-[#333]">确定要退稿吗？此操作将把稿件状态设为「退稿」。</p>
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setRejectConfirmOpen(false)} className="rounded border border-[#ccc] px-3 py-1.5 text-sm hover:bg-[#f5f5f5]">取消</button>
-              <button type="button" onClick={() => { setRejectConfirmOpen(false); runAction("reject"); }} disabled={actionLoading} className="rounded bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700">确定退稿</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        title="确认退稿"
+        open={rejectConfirmOpen}
+        onCancel={() => setRejectConfirmOpen(false)}
+        onOk={() => { setRejectConfirmOpen(false); runAction("reject"); }}
+        okText="确定退稿"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+        confirmLoading={actionLoading}
+      >
+        <p>确定要退稿吗？此操作将把稿件状态设为「退稿」。</p>
+      </Modal>
     </div>
   );
 }
