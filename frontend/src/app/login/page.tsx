@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Button, Card, Form, Input, Typography } from "antd";
+import { Alert, Button, Card, Form, Input, Typography } from "antd";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
 
@@ -60,7 +60,7 @@ export default function LoginPage() {
               <Input.Password placeholder="请输入密码" size="large" />
             </Form.Item>
             {error && (
-              <div className="mb-4 text-sm text-red-600">{error}</div>
+              <Alert message={error} type="error" showIcon className="mb-4" />
             )}
             <Form.Item className="!mb-4">
               <Button type="primary" htmlType="submit" loading={loading} block size="large">

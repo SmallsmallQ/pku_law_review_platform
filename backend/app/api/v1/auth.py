@@ -3,6 +3,7 @@
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
@@ -50,18 +51,30 @@ def _user_to_response(u: User) -> UserResponse:
     return UserResponse(id=u.id, email=u.email, real_name=u.real_name, role=u.role, institution=u.institution)
 
 
+def _assign_user_id_for_sqlite(db: Session, user: User) -> None:
+    """SQLite 下 BIGINT 主键不会自增，这里手动分配。"""
+    if db.bind is not None and db.bind.dialect.name == "sqlite":
+        user.id = (db.query(func.max(User.id)).scalar() or 0) + 1
+
+
 @router.post("/register", response_model=UserResponse)
 def register(body: RegisterBody, db: Session = Depends(get_db)):
     """作者注册。"""
-    if db.query(User).filter(User.email == body.email).first():
+    email = str(body.email).strip().lower()
+    if len(body.password) < 8:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="密码至少 8 位")
+    if not any(ch.isalpha() for ch in body.password) or not any(ch.isdigit() for ch in body.password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="密码需包含字母和数字")
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该邮箱已注册")
     user = User(
-        email=body.email,
+        email=email,
         password_hash=hash_password(body.password),
-        real_name=body.real_name,
-        institution=body.institution,
+        real_name=body.real_name.strip() if body.real_name else None,
+        institution=body.institution.strip() if body.institution else None,
         role="author",
     )
+    _assign_user_id_for_sqlite(db, user)
     db.add(user)
     db.commit()
     db.refresh(user)

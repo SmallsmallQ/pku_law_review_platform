@@ -13,6 +13,12 @@ from app.models import Manuscript, RevisionTemplate, Section, SystemConfig, User
 router = APIRouter()
 
 
+def _assign_user_id_for_sqlite(db: Session, user: User) -> None:
+    """SQLite 下 BIGINT 主键不会自增，这里手动分配。"""
+    if db.bind is not None and db.bind.dialect.name == "sqlite":
+        user.id = (db.query(func.max(User.id)).scalar() or 0) + 1
+
+
 # ----- Users -----
 class AdminUserItem(BaseModel):
     id: int
@@ -89,6 +95,7 @@ def create_user(
         real_name=body.real_name,
         role=body.role,
     )
+    _assign_user_id_for_sqlite(db, user)
     db.add(user)
     db.commit()
     db.refresh(user)

@@ -6,7 +6,7 @@ import { Card, Typography } from "antd";
 /** 首页左侧期刊封面展示（参考《中外法学》官网） */
 export default function JournalCoverCard() {
   return (
-    <Card className="overflow-hidden !border-[#e0ddd8] shadow-sm" bodyStyle={{ padding: 0 }}>
+    <Card className="overflow-hidden !border-[#e0ddd8] shadow-sm transition-shadow hover:shadow-md" styles={{ body: { padding: 0 } }}>
       <div className="bg-[#faf9f6] p-5 text-center ring-1 ring-[#e8e6e1]">
         <Typography.Title level={5} className="!mb-0 !mt-0 font-serif !text-[#1a1a1a]">
           《中外法学》

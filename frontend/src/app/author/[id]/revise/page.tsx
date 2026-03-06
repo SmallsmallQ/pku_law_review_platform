@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { Breadcrumb, Button, Card, Typography, Upload } from "antd";
+import { Alert, Breadcrumb, Button, Card, Typography, Upload } from "antd";
 import type { BreadcrumbItemType } from "antd/es/breadcrumb/Breadcrumb";
 import type { UploadFile } from "antd";
 import { useAuth } from "@/contexts/AuthContext";
@@ -43,6 +43,7 @@ export default function AuthorRevisePage() {
       return name.endsWith(".docx") || name.endsWith(".doc") || name.endsWith(".pdf");
     });
     setFileList(valid);
+    if (valid.length > 0) setError("");
     return valid;
   };
 
@@ -80,7 +81,7 @@ export default function AuthorRevisePage() {
                 <Button>选择文件（.docx / .doc / .pdf）</Button>
               </Upload>
             </div>
-            {error && <Typography.Text type="danger">{error}</Typography.Text>}
+            {error && <Alert message={error} type="error" showIcon className="mb-2" />}
             <div className="flex gap-2">
               <Button type="primary" onClick={submit} loading={loading}>
                 {loading ? "提交中…" : "提交修订稿"}

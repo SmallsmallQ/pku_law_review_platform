@@ -12,8 +12,9 @@ from app.config import settings
 from app.core.deps import RequireEditor, get_current_user, get_current_user_for_download
 from app.core.storage import resolve_path
 from app.db.base import get_db
-from app.models import EditorAction, Manuscript, ManuscriptVersion, User
+from app.models import EditorAction, Manuscript, ManuscriptVersion, User, ManuscriptParsed, ReviewReport
 from app.services.llm import chat_completion, is_llm_configured
+from app.services.review_service import generate_full_ai_report
 
 router = APIRouter()
 
@@ -84,8 +85,22 @@ def editor_manuscript_detail(
     version = None
     if m.current_version_id:
         version = db.query(ManuscriptVersion).filter(ManuscriptVersion.id == m.current_version_id).first()
+    # 解析结果
+    parsed = None
+    if m.current_version_id:
+        parsed = db.query(ManuscriptParsed).filter(ManuscriptParsed.version_id == m.current_version_id).first()
+    
+    # 初审报告
+    report_obj = None
+    if m.current_version_id:
+        report_obj = db.query(ReviewReport).filter(
+            ReviewReport.version_id == m.current_version_id,
+            ReviewReport.report_type == "preliminary"
+        ).first()
+
     # 编辑操作历史
     actions = db.query(EditorAction).filter(EditorAction.manuscript_id == id).order_by(EditorAction.created_at.desc()).limit(50).all()
+    
     return {
         "manuscript": {
             "id": m.id,
@@ -107,8 +122,18 @@ def editor_manuscript_detail(
             "parsed_at": version.parsed_at.isoformat() if version.parsed_at else None,
             "created_at": version.created_at.isoformat() if version.created_at else None,
         } if version else None,
-        "parsed": None,  # 解析结果后续接入 manuscript_parsed
-        "report": None,  # 初审报告后续接入 review_reports
+        "parsed": {
+            "title": parsed.title,
+            "abstract": parsed.abstract,
+            "keywords": parsed.keywords,
+            "body_structure": parsed.body_structure,
+            "parsed_at": parsed.created_at.isoformat() if parsed.created_at else None,
+        } if parsed else None,
+        "report": {
+            "content": report_obj.content.get("text") if isinstance(report_obj.content, dict) else report_obj.content,
+            "model": report_obj.content.get("model") if isinstance(report_obj.content, dict) else None,
+            "generated_at": report_obj.generated_at.isoformat() if report_obj.generated_at else None,
+        } if report_obj else None,
         "citation_issues": [],
         "similarity_results": [],
         "editor_actions": [
@@ -192,49 +217,20 @@ def editor_ai_review(
     m = db.query(Manuscript).filter(Manuscript.id == id).first()
     if not m:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
-    version = None
-    if m.current_version_id:
-        version = db.query(ManuscriptVersion).filter(
-            ManuscriptVersion.id == m.current_version_id,
-            ManuscriptVersion.manuscript_id == id,
-        ).first()
+    if not m.current_version_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该稿件尚无文件版本")
 
-    # 构建审稿提示：目前仅有标题与版本信息，后续可接入解析后的摘要、正文片段
-    title = m.title or "（无标题）"
-    file_name = version.file_name_original if version else "（无文件）"
-    word_count = f"{version.word_count} 字" if version and version.word_count else "（未统计）"
-    manuscript_info = f"""稿件编号：{m.manuscript_no}
-标题：{title}
-当前版本文件名：{file_name}
-字数：{word_count}"""
-
-    system_prompt = """你是法学期刊初审专家。请根据提供的稿件信息，给出简明、结构化的初审意见，供责任编辑参考。意见应客观、专业，并符合学术规范。若信息有限，可基于标题与形式信息给出初步判断与建议。"""
-    user_prompt = f"""请对以下稿件给出初审意见，按以下维度组织（每项简明扼要）：
-
-1. **总体印象**：选题与刊物匹配度、是否值得进一步审阅。
-2. **形式规范建议**：标题、摘要、关键词、格式等可改进之处。
-3. **引注与写作规范**：引注格式、学术写作规范方面的建议。
-4. **具体修改建议**：可操作的 2～5 条修改建议。
-
-稿件信息：
-{manuscript_info}
-
-请直接输出初审意见正文，使用 Markdown 格式。"""
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
-    try:
-        content = chat_completion(messages, max_tokens=2048)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
-    except Exception as e:
+    report = generate_full_ai_report(db, id, m.current_version_id)
+    if not report:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"大模型调用失败：{e!s}",
+            detail="生成 AI 报告失败，请检查大模型配置或解析状态",
         )
-    return AiReviewResponse(content=content, model=settings.llm_model)
+    
+    content = report.content.get("text") if isinstance(report.content, dict) else report.content
+    model = report.content.get("model") if isinstance(report.content, dict) else settings.llm_model
+    
+    return AiReviewResponse(content=content, model=model)
 
 
 @router.get("/manuscripts/{id}/files/{version_id}/download")

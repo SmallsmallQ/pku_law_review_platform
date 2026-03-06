@@ -32,7 +32,8 @@ async function request<T>(
   options: RequestInit & { params?: Record<string, string> } = {}
 ): Promise<T> {
   const { params, ...init } = options;
-  const url = params ? `${API_BASE}${path}?${new URLSearchParams(params)}` : `${API_BASE}${path}`;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = params ? `${API_BASE}${normalizedPath}?${new URLSearchParams(params)}` : `${API_BASE}${normalizedPath}`;
   const token = getToken();
   const headers: HeadersInit = {
     ...(init.headers as Record<string, string>),
@@ -45,8 +46,15 @@ async function request<T>(
     throw new Error("未登录或登录已过期");
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || err.message || String(res.status));
+    const err = await res.json().catch(() => ({ detail: res.statusText })) as { detail?: string | Array<{ msg?: string; message?: string }>; message?: string };
+    const detail = err.detail;
+    const msg =
+      typeof detail === "string"
+        ? detail
+        : Array.isArray(detail) && detail[0]
+          ? (detail[0].msg ?? detail[0].message ?? String(detail[0]))
+          : err.message ?? res.statusText;
+    throw new Error(msg || String(res.status));
   }
   if (res.status === 204) return undefined as T;
   return res.json();

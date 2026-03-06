@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Alert, Button, Card, Select, Space, Table, Typography } from "antd";
+import { Alert, Button, Card, Select, Space, Spin, Table, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
@@ -48,7 +48,13 @@ export default function EditorWorkbenchPage() {
     })();
   }, [user, authLoading, page, statusFilter, router]);
 
-  if (authLoading) return null;
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#f9f8f5] flex items-center justify-center">
+        <Spin size="large" tip="加载中…" />
+      </div>
+    );
+  }
   if (user && user.role !== "editor" && user.role !== "admin") return null;
 
   const columns: ColumnsType<EditorManuscriptItem> = [
@@ -87,10 +93,20 @@ export default function EditorWorkbenchPage() {
     },
   ];
 
+  const quickFilters = [
+    { key: "", label: "全部" },
+    { key: "submitted", label: "已投稿" },
+    { key: "under_review", label: "初审中" },
+    { key: "revision_requested", label: "待退修" },
+    { key: "revised_submitted", label: "已提交修订" },
+    { key: "accepted", label: "录用" },
+    { key: "rejected", label: "退稿" },
+  ];
+
   return (
     <div className="min-h-screen bg-[#f9f8f5]">
       <HeaderBar />
-      <div className="mx-auto max-w-5xl px-4 py-8">
+      <main id="main-content" className="mx-auto max-w-5xl px-4 py-8" aria-label="编辑工作台">
         <Card
           title="编辑工作台"
           extra={
@@ -110,6 +126,12 @@ export default function EditorWorkbenchPage() {
             </Space>
           }
         >
+          <Tabs
+            activeKey={statusFilter}
+            onChange={(k) => { setStatusFilter(k ?? ""); setPage(1); }}
+            className="mb-4"
+            items={quickFilters.map((f) => ({ key: f.key, label: f.label }))}
+          />
           {loadError && (
             <Alert message={loadError} type="warning" showIcon className="mb-4" action={<Button size="small" onClick={() => window.location.reload()}>刷新</Button>} />
           )}
@@ -118,6 +140,7 @@ export default function EditorWorkbenchPage() {
             columns={columns}
             dataSource={list}
             loading={loading}
+            scroll={{ x: "max-content" }}
             pagination={{
               current: page,
               pageSize,
@@ -127,11 +150,11 @@ export default function EditorWorkbenchPage() {
               onChange: setPage,
             }}
             locale={{
-              emptyText: "暂无稿件",
+              emptyText: "暂无稿件，请等待作者投稿",
             }}
           />
         </Card>
-      </div>
+      </main>
     </div>
   );
 }

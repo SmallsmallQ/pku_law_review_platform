@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Button, Result } from "antd";
+import { Button, Result, Space } from "antd";
 import HeaderBar from "@/components/HeaderBar";
 
 export default function NotFound() {
@@ -12,11 +12,16 @@ export default function NotFound() {
         <Result
           status="404"
           title="404"
-          subTitle="抱歉，您访问的页面不存在。"
+          subTitle="您访问的页面不存在，请检查链接或返回首页。"
           extra={
-            <Link href="/">
-              <Button type="primary">返回首页</Button>
-            </Link>
+            <Space>
+              <Link href="/">
+                <Button type="primary" className="!bg-[#8B1538] hover:!bg-[#70122e]">返回首页</Button>
+              </Link>
+              <Link href="/submit">
+                <Button>投稿入口</Button>
+              </Link>
+            </Space>
           }
         />
       </main>

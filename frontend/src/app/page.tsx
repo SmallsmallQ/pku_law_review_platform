@@ -15,7 +15,7 @@ const noticeItems = [
 ];
 
 const serviceLinks = [
-  { label: "投稿须知", href: "/submit" },
+  { label: "投稿须知", href: "/guide" },
   { label: "审稿流程", href: "/author" },
   { label: "作者中心", href: "/author" },
   { label: "投稿入口", href: "/submit" },
@@ -29,15 +29,16 @@ export default function HomePage() {
       <HeaderBar />
 
       {/* 主视觉区 */}
-      <section className="relative min-h-[320px] w-full overflow-hidden bg-[#8B1538] md:min-h-[380px]">
+      <section className="relative min-h-[320px] w-full overflow-hidden bg-[#8B1538] md:min-h-[380px]" aria-label="期刊标题与简介">
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
             backgroundImage:
               "url(/banner.jpg), linear-gradient(135deg, #8B1538 0%, #5c0e26 50%, #70122e 100%)",
           }}
+          aria-hidden
         />
-        <div className="absolute inset-0 bg-[#8B1538]/75" />
+        <div className="absolute inset-0 bg-[#8B1538]/75" aria-hidden />
         <div className="relative mx-auto flex min-h-[320px] max-w-6xl flex-col items-center justify-center px-6 py-16 text-center text-white md:min-h-[380px]">
           <Title level={1} className="!mb-3 !text-white !tracking-tight drop-shadow md:!text-4xl lg:!text-5xl">
             《中外法学》
@@ -51,19 +52,19 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className="relative z-10 mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+      <main id="main-content" className="relative z-10 mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8" aria-label="主内容">
         <Row gutter={[32, 24]}>
-          {/* 左栏：期刊封面 + 投稿与简介（合并为两小块） */}
+          {/* 左栏：期刊封面 + 投稿与简介 */}
           <Col xs={24} lg={8}>
             <Space direction="vertical" size="middle" className="w-full">
               <JournalCoverCard />
               <Card size="small" className="!border-[#e0ddd8]">
                 <div className="space-y-2">
-                  <Link href="/submit" className="block text-[#333] hover:text-[#8B1538] text-sm font-medium">
-                    投稿指南
+                  <Link href="/guide" className="block text-[#333] hover:text-[#8B1538] text-sm font-medium">
+                    投稿须知
                   </Link>
                   <Link href="/submit" className="block text-[#333] hover:text-[#8B1538] text-sm font-medium">
-                    投稿要求
+                    投稿入口
                   </Link>
                 </div>
                 <Paragraph className="!mb-0 !mt-3 text-[#666] text-xs border-t border-[#eee] pt-3">
@@ -139,8 +140,7 @@ export default function HomePage() {
             <HomeSidebar />
           </Col>
         </Row>
-      </div>
-
+      </main>
     </div>
   );
 }

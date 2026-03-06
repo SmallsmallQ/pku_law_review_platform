@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Alert, Button, Card, Checkbox, Form, Input, Typography, Upload } from "antd";
+import { Alert, Button, Card, Checkbox, Form, Input, Spin, Typography, Upload } from "antd";
 import type { UploadFile } from "antd";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
@@ -29,7 +29,13 @@ export default function SubmitPage() {
     if (!authLoading && !user) router.push("/login?returnUrl=/submit");
   }, [user, authLoading, router]);
 
-  if (authLoading || !user) return null;
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen bg-[#f9f8f5] flex items-center justify-center">
+        <Spin size="large" tip="加载中…" />
+      </div>
+    );
+  }
 
   const submit = async (values: Record<string, string | boolean>) => {
     const file = fileList[0]?.originFileObj;

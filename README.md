@@ -1,62 +1,156 @@
-# 中外法学智能编审系统（Law Journal Intelligent Editorial System）
+# 中外法学智能编审系统
 
-面向法学期刊编辑部的**投稿管理 + AI 辅助初审**平台。初版（v0.1）聚焦：作者规范投稿 → 系统自动解析 → 生成 AI 初审报告 → 编辑查看并决定退修/继续/退稿。
+面向法学期刊编辑部的 **投稿管理 + AI 辅助初审** 平台。作者在线投稿 → 系统解析与 AI 初审报告 → 编辑退修/录用/退稿，全流程闭环。
 
-## 项目状态
+---
 
-- **当前阶段**：业务闭环已打通，可本地跑通「注册 → 登录 → 投稿 → 编辑处理（退修/退稿/录用）」与「作者查看退修意见、上传修订稿」。
-- **已实现**：用户与权限（作者/编辑）、稿件 CRUD、文件上传与下载、编辑工作台与操作记录；前端 Ant Design 统一 UI、登录/注册、投稿表单（含版权转让协议勾选）、作者中心、编辑工作台及详情与操作、退修/退稿/录用、AI 初审报告生成入口；版权转让协议独立页、404 页、全局页脚。
-- **待接**：文档解析、知识库入库、AI 报告内容与知识库检索（见 PRD 开发顺序第 3–5 步）。
+## 功能概览
+
+| 模块       | 说明 |
+|------------|------|
+| **作者端** | 注册/登录、投稿（标题/摘要/关键词/主稿文件）、我的稿件列表与详情、查看退修意见、上传修订稿、下载稿件 |
+| **编辑端** | 稿件列表与筛选、稿件详情与驾驶舱、查看 AI 初审报告、退修/退稿/录用、触发 AI 报告生成 |
+| **管理后台** | 仪表盘统计、用户管理（CRUD、角色/启用）、栏目管理、退修意见模板、系统配置（键值对） |
+| **公开页** | 首页、投稿须知、版权转让协议、404 等 |
+
+角色：**作者**（author）、**编辑**（editor）、**管理员**（admin）。仅 admin 可访问管理后台。
+
+---
+
+## 技术栈
+
+| 层级   | 技术 |
+|--------|------|
+| 前端   | Next.js 14（App Router）+ TypeScript + Tailwind CSS + Ant Design 5 |
+| 后端   | FastAPI + SQLAlchemy 2 + JWT |
+| 数据库 | **已整合在项目内**：默认 SQLite（单文件，无需装数据库），生产可换 PostgreSQL |
+| 文件   | 本地目录（可扩展 MinIO/OSS） |
+| AI     | 阿里云百炼（OpenAI 兼容接口，可选） |
+
+---
 
 ## 文档索引
 
 | 文档 | 说明 |
 |------|------|
-| [docs/PRD-v0.1.md](docs/PRD-v0.1.md) | 初版产品需求说明：定位、角色、流程、功能边界、页面、AI 报告结构、知识库与开发顺序 |
-| [docs/database-schema.md](docs/database-schema.md) | 数据库表设计：用户、稿件与版本、解析结果、审稿报告、引注/相似/操作表、知识库切块与向量 |
-| [docs/api-spec.md](docs/api-spec.md) | API 清单：认证、作者端、编辑端、后台任务、公开页、管理员端及实现优先级 |
-| [docs/tech-stack.md](docs/tech-stack.md) | 技术选型说明：Next.js + FastAPI 组合理由与初版锁定栈 |
+| [docs/PRD-v0.1.md](docs/PRD-v0.1.md) | 产品需求：角色、流程、功能边界、AI 报告结构、开发顺序 |
+| [docs/database-schema.md](docs/database-schema.md) | 数据库表设计：用户、稿件与版本、解析、报告、操作、知识库 |
+| [docs/api-spec.md](docs/api-spec.md) | API 清单：认证、作者端、编辑端、管理员端、公开页 |
+| [docs/tech-stack.md](docs/tech-stack.md) | 技术选型说明 |
+| [docs/admin.md](docs/admin.md) | 管理后台功能与权限说明 |
 
-## 技术选型（初版，已锁定）
+---
 
-- **前端**：Next.js（App Router）+ TypeScript + Tailwind CSS + **Ant Design 5**
-- **后端**：FastAPI + PostgreSQL（pgvector 做向量）
-- **文件存储**：MinIO / OSS（或初版本地目录）
-- **认证**：JWT，初版简单稳定
-- **任务**：初版轻量，后续再加异步队列
+## 环境要求
 
-## 本地运行
+- **Node.js** 18+（前端）
+- **Python** 3.10+（后端）
+- **无需单独安装数据库**：项目内置 SQLite，数据存成后端目录下一个文件；生产环境如需再换 PostgreSQL。
+
+---
+
+## 如何启动（本地已配好，一条命令）
+
+本地运行已全部配好：默认配置在 `backend/env.local`，启动脚本会自动生成 `.env`、安装依赖、建表并启动。
 
 ```bash
-# 1. 后端：建库并配置 backend/.env（SECRET_KEY 等，见 backend/.env.example）
-cd backend
-pip install -r requirements.txt
-# 未安装/未启动 PostgreSQL 时：在 .env 中设置 USE_SQLITE=true，或留空 DATABASE_URL（默认 SQLite）
-python -m scripts.init_db
-# 可选：创建编辑账号 SEED_EDITOR_EMAIL=editor@test.com SEED_EDITOR_PASSWORD=xxx python -m scripts.init_db
-uvicorn app.main:app --reload --port 8000
-
-# 2. 前端（另开终端）
-cd frontend && npm install && npm run dev
+chmod +x scripts/start.sh   # 只需执行一次
+./scripts/start.sh
 ```
 
-- 前端：<http://localhost:3000>（首页、登录/注册、投稿、作者中心、编辑工作台、版权转让协议、404）
-- 后端：<http://localhost:8000/docs>（OpenAPI）、<http://localhost:8000/health>
-- 测试：先注册作者账号投稿；在数据库中将该用户 `role` 改为 `editor`，或使用 `SEED_EDITOR_EMAIL` / `SEED_EDITOR_PASSWORD` 创建编辑账号，登录后进入编辑工作台处理稿件（退修/退稿/录用、生成 AI 初审报告）。
+- **前端**：<http://localhost:3000>
+- **后端 API 文档**：<http://localhost:8000/docs>
+- **健康检查**：<http://localhost:8000/health>
 
-## 开发顺序建议
+脚本会自动：生成 `backend/.env`、安装后端/前端依赖（首次）、建表（SQLite）、启动后端（8000）与前端（3000）。按 **Ctrl+C** 会同时停掉后端和前端。
 
-1. 产品原型与数据结构（已由 PRD + 库表 + API 覆盖）
-2. 后端基础骨架（用户认证、稿件 CRUD、状态与文件存储）
-3. 文档解析链路
-4. 知识库入库与相似度检索
-5. AI 初审报告生成
-6. 编辑工作台与稿件详情页打通
-7. 管理员配置与增强
+---
+
+### 首次使用（登录与角色）
+
+1. **作者**：打开首页 → 注册 → 登录 → 投稿入口提交稿件。
+2. **编辑**：在数据库中将某用户 `role` 改为 `editor`，或创建种子编辑账号：
+   ```bash
+   cd backend
+   SEED_EDITOR_EMAIL=editor@test.com SEED_EDITOR_PASSWORD=yourpassword python -m scripts.init_db
+   ```
+   用该邮箱登录后可见「编辑工作台」。
+3. **管理员**：将某用户 `role` 改为 `admin`，登录后顶栏出现「管理后台」，或直接访问 `/admin`。
+
+---
+
+## 环境变量（后端 `.env`）
+
+| 变量 | 说明 | 默认 |
+|------|------|------|
+| `DATABASE_URL` | 数据库连接；**不配则用项目内置 SQLite**（`backend/law_review.db`），无需单独建库 | `sqlite:///./law_review.db` |
+| `USE_SQLITE` | 为 `true` 时强制 SQLite（例如本机未装 PostgreSQL 时） | `false` |
+| `SECRET_KEY` | JWT 密钥，生产务必修改 | `change-me-in-production` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Token 有效期（分钟） | 1440 |
+| `STORAGE_TYPE` | 存储类型：`local` | `local` |
+| `STORAGE_LOCAL_PATH` | 本地存储目录 | `./storage` |
+| `CORS_ORIGINS` | 允许的前端来源，JSON 数组 | `["http://localhost:3000"]` |
+| `DASHSCOPE_API_KEY` | 阿里云百炼 API Key（AI 初审报告） | 空 |
+| `LLM_BASE_URL` | 大模型接口地址 | 华北2 百炼兼容地址 |
+| `LLM_MODEL` | 模型名 | `qwen3.5-plus` |
+
+详见 `backend/.env.example`。前端可选配置见 `frontend/.env.example`（如生产直连后端时设置 `NEXT_PUBLIC_API_URL`）。
+
+---
+
+## 管理后台
+
+- **入口**：仅 **admin** 角色可见顶栏「管理后台」及首页「系统入口」中的管理后台；或直接访问 `/admin`（非 admin 会跳转首页）。
+- **功能**：
+  - **仪表盘** `/admin`：稿件总数、待处理数、栏目/模板数、用户角色分布、稿件状态分布。
+  - **用户管理** `/admin/users`：列表（角色/状态筛选、分页）、新建用户、编辑（姓名/角色/启用）。
+  - **栏目管理** `/admin/sections`：列表、新增/编辑/删除栏目。
+  - **退修模板** `/admin/templates`：列表、新增/编辑模板。
+  - **系统配置** `/admin/config`：键值对配置的增删改保存。
+
+详见 [docs/admin.md](docs/admin.md)。
+
+---
+
+## 项目结构（简要）
+
+```
+pku_law_review_platform/
+├── backend/
+│   ├── app/
+│   │   ├── api/v1/          # 路由：auth, manuscripts, editor, admin, ai
+│   │   ├── core/             # 安全、依赖、配置
+│   │   ├── db/               # 数据库与 Session
+│   │   ├── models/          # ORM：User, Section, Manuscript, RevisionTemplate, SystemConfig 等
+│   │   └── main.py
+│   ├── scripts/
+│   │   └── init_db.py       # 建表 + 可选种子编辑账号
+│   ├── .env.example
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── app/             # 页面：首页、登录/注册、投稿、作者中心、编辑工作台、管理后台
+│   │   ├── components/      # HeaderBar, HomeSidebar, Footer 等
+│   │   ├── contexts/       # AuthContext
+│   │   ├── services/       # api.ts（auth, manuscripts, editor, admin, ai）
+│   │   └── lib/            # 常量等
+│   └── package.json
+├── docs/                    # PRD、库表、API、技术栈、管理后台说明
+└── README.md
+```
+
+---
+
+## 开发与后续
+
+- **开发顺序建议**：见 [docs/PRD-v0.1.md](docs/PRD-v0.1.md) 第九章；当前业务闭环与管理后台已打通，后续可接文档解析、知识库与报告内容增强。
+- **生产部署**：建议使用 PostgreSQL、独立 `SECRET_KEY`、Alembic 做迁移；前端 `npm run build` + `npm run start`，后端用 gunicorn/uvicorn 多进程。
+
+---
 
 ## 初版成功标准
 
-- 作者可完成投稿并查看状态与退修意见、上传修订稿
-- 稿件能自动解析，系统能生成一份结构化初审报告
-- 编辑能在后台查看报告并对稿件进行状态与退修操作
-- 全链路可跑通、可演示、可交付编辑部试用
+- 作者可完成投稿并查看状态与退修意见、上传修订稿。
+- 编辑可在工作台查看稿件与 AI 初审报告，并进行退修/退稿/录用操作。
+- 管理员可管理用户、栏目、退修模板与系统配置。
+- 全链路可跑通、可演示、可交付编辑部试用。

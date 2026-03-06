@@ -3,7 +3,7 @@
 """
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, status, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, status, UploadFile, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -11,6 +11,7 @@ from app.core.deps import get_current_user, get_current_user_for_download
 from app.core.storage import ALLOWED_EXTENSIONS, resolve_path, save_manuscript_file, save_supplement_file
 from app.db.base import get_db
 from app.models import EditorAction, Manuscript, ManuscriptVersion, User
+from app.services.review_service import process_manuscript_parsing
 from app.schemas.manuscript import (
     ManuscriptCreateResponse,
     ManuscriptDetailResponse,
@@ -62,9 +63,9 @@ def create_manuscript(
     institution: Annotated[str, Form()] = "",
     fund: Annotated[str, Form()] = "",
     contact: Annotated[str, Form()] = "",
-    section_id: Annotated[int | None, Form()] = None,
     submit: Annotated[str, Form()] = "false",
     supplement: Annotated[UploadFile | None, File()] = None,
+    background_tasks: BackgroundTasks = None,
 ):
     """创建稿件并上传主稿（必填）与补充材料（可选）。submit=true 则状态为 submitted。"""
     if not file.filename:
@@ -113,6 +114,11 @@ def create_manuscript(
     db.flush()
     manuscript.current_version_id = version.id
     db.commit()
+    
+    # 异步解析
+    if background_tasks:
+        background_tasks.add_task(process_manuscript_parsing, db, version.id)
+    
     db.refresh(manuscript)
     db.refresh(version)
     return ManuscriptCreateResponse(
@@ -195,6 +201,7 @@ def upload_revision(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
     file: Annotated[UploadFile, File()],
+    background_tasks: BackgroundTasks = None,
 ):
     """上传修订稿，仅当状态为 revision_requested 且为本人稿件。创建新版本并可将状态改为 revised_submitted。"""
     m = db.query(Manuscript).filter(Manuscript.id == id).first()
@@ -226,6 +233,11 @@ def upload_revision(
     m.current_version_id = version.id
     m.status = "revised_submitted"
     db.commit()
+
+    # 异步解析
+    if background_tasks:
+        background_tasks.add_task(process_manuscript_parsing, db, version.id)
+
     db.refresh(version)
     return _version_brief(version)
 

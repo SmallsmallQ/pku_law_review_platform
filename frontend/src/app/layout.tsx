@@ -3,6 +3,7 @@ import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { AuthProvider } from "@/contexts/AuthContext";
+import DocumentTitle from "@/components/DocumentTitle";
 import Footer from "@/components/Footer";
 import theme from "@/theme/themeConfig";
 import "./globals.css";
@@ -20,9 +21,16 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className="flex min-h-screen flex-col">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded focus:bg-[#8B1538] focus:px-4 focus:py-2 focus:text-white focus:outline-none focus:ring-2 focus:ring-[#8B1538]"
+        >
+          跳过导航
+        </a>
         <AntdRegistry>
           <ConfigProvider theme={theme} locale={zhCN}>
             <AuthProvider>
+              <DocumentTitle />
               <div className="flex min-h-screen flex-col">
                 {children}
                 <Footer />

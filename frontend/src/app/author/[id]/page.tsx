@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Alert, Breadcrumb, Button, Card, Descriptions, List, Space, Tag, Typography } from "antd";
+import { Alert, Breadcrumb, Button, Card, Descriptions, List, Space, Spin, Tag, Typography } from "antd";
 import type { BreadcrumbItemType } from "antd/es/breadcrumb/Breadcrumb";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
@@ -26,6 +26,7 @@ export default function AuthorManuscriptDetailPage() {
   const [revisions, setRevisions] = useState<{ comment?: string; created_at?: string }[]>([]);
   const [versions, setVersions] = useState<VersionItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [revisedMessage, setRevisedMessage] = useState(false);
 
   useEffect(() => {
@@ -39,6 +40,7 @@ export default function AuthorManuscriptDetailPage() {
   useEffect(() => {
     if (!user || !id) return;
     (async () => {
+      setLoadError(null);
       try {
         const [d, rev, ver] = await Promise.all([
           manuscriptsApi.get(Number(id)),
@@ -48,8 +50,9 @@ export default function AuthorManuscriptDetailPage() {
         setDetail(d as Record<string, unknown>);
         setRevisions((rev as { items: { comment?: string; created_at?: string }[] }).items);
         setVersions((ver as { items: VersionItem[] }).items);
-      } catch {
+      } catch (e) {
         setDetail(null);
+        setLoadError(e instanceof Error ? e.message : "加载失败，请刷新重试");
       } finally {
         setLoading(false);
       }
@@ -84,7 +87,18 @@ export default function AuthorManuscriptDetailPage() {
           {revisedMessage && (
             <Alert message="修订稿已提交成功" type="success" showIcon className="mb-4" />
           )}
-          {loading && <Typography.Text type="secondary">加载中…</Typography.Text>}
+          {loading && (
+            <div className="flex items-center gap-3 py-6">
+              <Spin />
+              <Typography.Text type="secondary">加载稿件信息…</Typography.Text>
+            </div>
+          )}
+          {!loading && loadError && (
+            <>
+              <Alert message={loadError} type="warning" showIcon className="mb-4" action={<Button size="small" onClick={() => window.location.reload()}>刷新</Button>} />
+              <Link href="/author"><Button type="link" className="!px-0">返回我的稿件</Button></Link>
+            </>
+          )}
           {!loading && detail && (
             <>
               <Descriptions column={1} size="small" bordered className="mb-4">

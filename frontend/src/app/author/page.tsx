@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Alert, Button, Card, Select, Space, Table, Typography } from "antd";
+import { Alert, Button, Card, Select, Space, Spin, Table, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
@@ -57,7 +57,13 @@ export default function AuthorCenterPage() {
     })();
   }, [user, page, statusFilter, router]);
 
-  if (authLoading || !user) return null;
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen bg-[#f9f8f5] flex items-center justify-center">
+        <Spin size="large" tip="加载中…" />
+      </div>
+    );
+  }
 
   const columns: ColumnsType<ManuscriptListItem> = [
     { title: "稿件编号", dataIndex: "manuscript_no", key: "manuscript_no", width: 120 },
@@ -104,7 +110,7 @@ export default function AuthorCenterPage() {
   return (
     <div className="min-h-screen bg-[#f9f8f5]">
       <HeaderBar />
-      <div className="mx-auto max-w-5xl px-4 py-8">
+      <main id="main-content" className="mx-auto max-w-5xl px-4 py-8" aria-label="我的稿件">
         <Card
           title="我的稿件"
           extra={
@@ -135,6 +141,7 @@ export default function AuthorCenterPage() {
             columns={columns}
             dataSource={list}
             loading={loading}
+            scroll={{ x: "max-content" }}
             pagination={{
               current: page,
               pageSize,
@@ -155,7 +162,7 @@ export default function AuthorCenterPage() {
             }}
           />
         </Card>
-      </div>
+      </main>
     </div>
   );
 }

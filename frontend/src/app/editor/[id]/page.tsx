@@ -28,6 +28,7 @@ export default function EditorManuscriptDetailPage() {
   const router = useRouter();
   const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [revisionModalOpen, setRevisionModalOpen] = useState(false);
   const [revisionComment, setRevisionComment] = useState("");
@@ -37,18 +38,23 @@ export default function EditorManuscriptDetailPage() {
   const [aiReport, setAiReport] = useState<{ content: string; model: string } | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const d = await editorApi.manuscriptDetail(Number(id));
       setDetail(d as Record<string, unknown>);
-    } catch {
+      if ((d as any).report) {
+        setAiReport((d as any).report);
+      }
+    } catch (e) {
       setDetail(null);
+      setLoadError(e instanceof Error ? e.message : "加载失败，请刷新重试");
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     if (!user || user.role === "author") {
@@ -56,7 +62,7 @@ export default function EditorManuscriptDetailPage() {
       return;
     }
     load();
-  }, [user, id, router]);
+  }, [user, id, router, load]);
 
   const runAiReview = async () => {
     if (!id) return;
@@ -103,15 +109,19 @@ export default function EditorManuscriptDetailPage() {
 
   const manuscript = detail?.manuscript as Record<string, unknown> | undefined;
   const currentVersion = detail?.current_version as Record<string, unknown> | undefined;
+  const parsed = detail?.parsed as Record<string, unknown> | undefined;
   const editorActions = (detail?.editor_actions as Record<string, unknown>[]) || [];
   const status = manuscript?.status as string | undefined;
+  const manuscriptNo = manuscript?.manuscript_no as string | undefined;
+  const title = manuscript?.title as string | undefined;
+  const breadcrumbTitle = manuscriptNo || (title ? `${String(title).slice(0, 20)}${String(title).length > 20 ? "…" : ""}` : "稿件详情");
 
   if (!user || user.role === "author") return null;
 
   const breadcrumbItems: BreadcrumbItemType[] = [
     { title: <Link href="/">首页</Link> },
     { title: <Link href="/editor">编辑工作台</Link> },
-    { title: "稿件详情" },
+    { title: detail && manuscript ? breadcrumbTitle : "稿件详情" },
   ];
 
   return (
@@ -131,6 +141,12 @@ export default function EditorManuscriptDetailPage() {
               <Spin />
               <Typography.Text type="secondary">加载稿件信息…</Typography.Text>
             </div>
+          )}
+          {!loading && loadError && (
+            <>
+              <Alert message={loadError} type="warning" showIcon className="mb-4" action={<Button size="small" onClick={() => load()}>重试</Button>} />
+              <Link href="/editor"><Button type="link" className="!px-0">返回列表</Button></Link>
+            </>
           )}
           {!loading && detail && manuscript && (
             <>
@@ -152,6 +168,14 @@ export default function EditorManuscriptDetailPage() {
                   </Descriptions.Item>
                 )}
               </Descriptions>
+              {parsed && (
+                <Card size="small" title="解析元数据" className="mb-4">
+                  <Descriptions column={1} size="small">
+                    <Descriptions.Item label="摘要">{String(parsed.abstract || "未识别")}</Descriptions.Item>
+                    <Descriptions.Item label="关键词">{String(parsed.keywords || "未识别")}</Descriptions.Item>
+                  </Descriptions>
+                </Card>
+              )}
               <Card size="small" title="操作" className="mb-4">
                 {aiReviewLoading && (
                   <Alert message="正在生成 AI 初审报告，预计需要 10–30 秒，请稍候。" type="info" showIcon className="mb-3" />
