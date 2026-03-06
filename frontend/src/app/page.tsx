@@ -63,7 +63,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <main id="main-content" className="pb-14" aria-label="主内容">
+      <main id="main-content" className="pb-0" aria-label="主内容">
         <section className="relative overflow-hidden">
           <div
             className="pointer-events-none absolute left-1/2 top-0 h-full w-screen -translate-x-1/2 opacity-[0.06]"
