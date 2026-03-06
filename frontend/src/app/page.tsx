@@ -33,7 +33,7 @@ export default function HomePage() {
   const { user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="bg-white">
       <HeaderBar />
 
       <section className="relative min-h-[320px] w-full overflow-hidden bg-[#8B1538] md:min-h-[360px]" aria-label="期刊标题与简介">
@@ -63,55 +63,55 @@ export default function HomePage() {
         </div>
       </section>
 
-      <main id="main-content" className="pb-0" aria-label="主内容">
-        <section className="relative overflow-hidden">
-          <div
-            className="pointer-events-none absolute left-1/2 top-0 h-full w-screen -translate-x-1/2 opacity-[0.06]"
-            style={{ backgroundImage: "url(/banner.jpg)", backgroundPosition: "center", backgroundSize: "cover" }}
-            aria-hidden
-          />
-          <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
-            <div className="border-b border-[#d7dce5] py-4 text-sm text-[#4f5563]">
+      <main id="main-content" className="relative pb-0" aria-label="主内容">
+        <div
+          className="pointer-events-none absolute inset-0 z-0 opacity-[0.06]"
+          style={{ backgroundImage: "url(/banner.jpg)", backgroundPosition: "center", backgroundSize: "cover" }}
+          aria-hidden
+        />
+        <section className="relative z-10">
+          <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+            <div className="border-b border-[#d7dce5] py-5 text-base text-[#4f5563]">
               目录与全文以官网为准，本系统用于投稿、审稿流转与作者回传。
             </div>
 
             <div className="relative grid lg:grid-cols-[280px_minmax(0,1fr)_320px]">
-              <aside className="border-b border-[#dfe4ec] py-6 lg:border-b-0 lg:border-r lg:pr-6">
+              <aside className="border-b border-[#dfe4ec] py-8 lg:border-b-0 lg:border-r lg:pr-8">
               <Text className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#8B1538]">Peking University Law Journal</Text>
-              <Title level={2} className="!mb-0 !mt-3 !text-[34px] !font-semibold !tracking-tight !text-[#2d313d] whitespace-nowrap">
+              <Title level={2} className="!mb-0 !mt-4 !text-[40px] !font-semibold !tracking-tight !text-[#2d313d] whitespace-nowrap">
                 《中外法学》
               </Title>
-              <div className="mt-4 space-y-1 text-[14px] text-[#5f6573]">
+              <div className="mt-5 space-y-1 text-[18px] leading-8 text-[#5f6573]">
                 <p className="m-0">创刊时间：1984 年</p>
                 <p className="m-0">2026 年刊期：第 38 卷</p>
               </div>
-              <Link href="/submit" className="mt-5 inline-flex items-center gap-1 text-[16px] font-semibold text-[#8B1538] hover:underline">
+              <Link href="/submit" className="mt-6 inline-flex items-center gap-1 text-[18px] font-semibold text-[#8B1538] hover:underline">
                 投稿入口 <ArrowRightOutlined />
               </Link>
 
-              <Paragraph className="!mb-0 !mt-8 border-t border-[#e6eaf0] pt-4 !text-[14px] !leading-7 !text-[#59606f]">
+              <Paragraph className="!mb-0 !mt-10 border-t border-[#e6eaf0] pt-6 !text-[16px] !leading-9 !text-[#59606f]">
                 《中外法学》由北京大学法学院主办，CSSCI 来源期刊。系统支持在线投稿、审稿跟踪与退修上传。
               </Paragraph>
               </aside>
 
-              <div className="border-b border-[#dfe4ec] py-6 lg:border-b-0 lg:border-r lg:px-6">
-                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#e6eaf0] pb-4">
+              <div className="border-b border-[#dfe4ec] py-8 lg:border-b-0 lg:border-r lg:px-8">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#e6eaf0] pb-5">
                 <div>
-                  <Text className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8B1538]">当期目录</Text>
-                  <Title level={3} className="!mb-0 !mt-2 !text-[34px] !font-semibold !text-[#2e3340] whitespace-nowrap">第 38 卷（2026）第 1 期</Title>
+                  <Text className="text-sm font-semibold uppercase tracking-[0.14em] text-[#8B1538]">当期目录</Text>
+                  <Title level={3} className="!mb-0 !mt-2 !text-[38px] !font-semibold !text-[#2e3340] whitespace-nowrap">第 38 卷（2026）第 1 期</Title>
                 </div>
-                <a href="https://www.law.pku.edu.cn/" target="_blank" rel="noopener noreferrer" className="text-[16px] font-semibold text-[#8B1538] hover:underline">
+                <a href="https://www.law.pku.edu.cn/" target="_blank" rel="noopener noreferrer" className="text-[18px] font-semibold text-[#8B1538] hover:underline">
                   MORE+
                 </a>
                 </div>
 
-                <Paragraph className="!mb-0 !mt-4 !text-[15px] !leading-8 !text-[#5a6170]">
+                <Paragraph className="!mb-0 !mt-5 !text-[18px] !leading-9 !text-[#5a6170]">
                   目录与全文见本刊官网；本系统负责投稿、审稿流转与作者回传。
                 </Paragraph>
 
-                <div className="mt-6 border-t border-[#e6eaf0] pt-5">
-                  <Text className="text-[18px] font-semibold text-[#2e3340]">服务与指南</Text>
-                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[16px]">
+                <div className="mt-8 border-t border-[#e6eaf0] pt-6">
+                  <Text className="text-[24px] font-semibold text-[#2e3340]">服务与指南</Text>
+                  <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3 text-[18px]">
                     {serviceLinks.map((item) => (
                       <Link key={item.label} href={item.href} className="text-[#8B1538] hover:underline">
                         {item.label}
@@ -120,18 +120,18 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <div className="mt-6 border-t border-[#e6eaf0] pt-5">
-                  <Text className="text-[18px] font-semibold text-[#2e3340]">通知</Text>
-                  <div className="mt-3 space-y-3">
+                <div className="mt-8 border-t border-[#e6eaf0] pt-6">
+                  <Text className="text-[24px] font-semibold text-[#2e3340]">通知</Text>
+                  <div className="mt-4 space-y-4">
                     {noticeItems.map((item) => (
                       <div key={item.text} className="flex items-start gap-3">
                         <span className="mt-0.5 rounded-sm bg-[#8B1538] px-2 py-0.5 text-xs font-semibold text-white">{item.type}</span>
                         {item.href ? (
-                          <Link href={item.href} className="text-[15px] text-[#4f5563] hover:text-[#8B1538]">
+                          <Link href={item.href} className="text-[16px] text-[#4f5563] hover:text-[#8B1538]">
                             {item.text}
                           </Link>
                         ) : (
-                          <span className="text-[15px] text-[#4f5563]">{item.text}</span>
+                          <span className="text-[16px] text-[#4f5563]">{item.text}</span>
                         )}
                       </div>
                     ))}
@@ -139,21 +139,21 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <aside className="py-6 lg:pl-6">
-                <Text className="text-[18px] font-semibold text-[#2e3340]">系统入口</Text>
-                <Paragraph className="!mb-0 !mt-2 !text-sm !leading-7 !text-[#626978]">
+              <aside className="py-8 lg:pl-8">
+                <Text className="text-[24px] font-semibold text-[#2e3340]">系统入口</Text>
+                <Paragraph className="!mb-0 !mt-3 !text-[16px] !leading-8 !text-[#626978]">
                   投稿、审稿、查看进度一站完成。{user ? "当前账号已登录。" : "请先登录后使用完整功能。"}
                 </Paragraph>
 
-                <div className="mt-4 space-y-3">
+                <div className="mt-6 space-y-4">
                   {actionLinks.map((item) => (
-                    <div key={item.label} className="flex items-center justify-between border-b border-[#eceff4] pb-3">
+                    <div key={item.label} className="flex items-center justify-between border-b border-[#eceff4] pb-4">
                       <div>
-                        <p className="m-0 text-[16px] font-semibold text-[#2d313d]">{item.label}</p>
-                        <p className="m-0 mt-1 text-sm text-[#6a7180]">{item.desc}</p>
+                        <p className="m-0 text-[20px] font-semibold text-[#2d313d]">{item.label}</p>
+                        <p className="m-0 mt-1 text-[15px] text-[#6a7180]">{item.desc}</p>
                       </div>
                       <Link href={item.href}>
-                        <Button type="primary" size="middle" className="!rounded !border-0 !bg-[#8B1538] hover:!bg-[#70122e]">
+                        <Button type="primary" size="middle" className="!h-11 !rounded !border-0 !bg-[#8B1538] !px-6 text-base hover:!bg-[#70122e]">
                           进入
                         </Button>
                       </Link>

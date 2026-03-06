@@ -1,9 +1,107 @@
 import os
-from typing import Dict, Any, List, Optional
-from datetime import datetime
+import re
+import zipfile
+import xml.etree.ElementTree as ET
+from typing import Dict, Any
 import docx
 import fitz  # PyMuPDF
 from pathlib import Path
+
+DOCX_NS = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+
+
+def _first_non_empty_paragraph(doc: Any) -> str:
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if text:
+            return text
+    return ""
+
+
+def _extract_abstract_and_keywords(full_text: str) -> tuple[str, str]:
+    lines = [line.strip() for line in full_text.splitlines()]
+    abstract = ""
+    keywords = ""
+
+    abstract_re = re.compile(r"^[【\[]?\s*摘要\s*[】\]]?\s*[:：]?\s*(.*)$")
+    keywords_re = re.compile(r"^[【\[]?\s*(关键词|关键字)\s*[】\]]?\s*[:：]?\s*(.*)$")
+
+    for i, line in enumerate(lines):
+        if not line:
+            continue
+        if not abstract:
+            m = abstract_re.match(line)
+            if m:
+                value = (m.group(1) or "").strip()
+                if value:
+                    abstract = value
+                else:
+                    for j in range(i + 1, len(lines)):
+                        nxt = lines[j]
+                        if not nxt:
+                            continue
+                        if keywords_re.match(nxt):
+                            break
+                        abstract = nxt
+                        break
+        if not keywords:
+            m = keywords_re.match(line)
+            if m:
+                keywords = (m.group(2) or "").strip()
+
+    if not abstract:
+        m = re.search(
+            r"[【\[]?\s*摘要\s*[】\]]?\s*[:：]?\s*(.+?)(?:\n\s*[【\[]?\s*(?:关键词|关键字)\s*[】\]]?\s*[:：]|\Z)",
+            full_text,
+            flags=re.S,
+        )
+        if m:
+            abstract = re.sub(r"\s+", " ", m.group(1)).strip()
+
+    if not keywords:
+        m = re.search(r"[【\[]?\s*(?:关键词|关键字)\s*[】\]]?\s*[:：]?\s*(.+)", full_text)
+        if m:
+            keywords = m.group(1).splitlines()[0].strip()
+
+    return abstract, keywords
+
+
+def _extract_notes_from_docx_xml(file_path: Path, tag_name: str) -> list[str]:
+    xml_path = f"word/{tag_name}.xml"
+    notes: list[str] = []
+    if not file_path.exists():
+        return notes
+
+    try:
+        with zipfile.ZipFile(file_path) as zf:
+            if xml_path not in zf.namelist():
+                return notes
+            xml_data = zf.read(xml_path)
+    except Exception:
+        return notes
+
+    try:
+        root = ET.fromstring(xml_data)
+    except ET.ParseError:
+        return notes
+
+    node_name = "footnote" if tag_name == "footnotes" else "endnote"
+    for note_node in root.findall(f"w:{node_name}", DOCX_NS):
+        note_type = note_node.attrib.get(f"{{{DOCX_NS['w']}}}type")
+        if note_type in {"separator", "continuationSeparator", "continuationNotice"}:
+            continue
+        note_id = note_node.attrib.get(f"{{{DOCX_NS['w']}}}id")
+        text_chunks = [
+            (t.text or "").strip()
+            for t in note_node.findall(".//w:t", DOCX_NS)
+            if (t.text or "").strip()
+        ]
+        if not text_chunks:
+            continue
+        note_text = " ".join(text_chunks)
+        notes.append(f"{note_id}: {note_text}" if note_id else note_text)
+    return notes
+
 
 def parse_docx(file_path: Path) -> Dict[str, Any]:
     """解析 Word 文档。"""
@@ -14,38 +112,28 @@ def parse_docx(file_path: Path) -> Dict[str, Any]:
     for para in doc.paragraphs:
         full_text.append(para.text)
         # 简单识别标题（基于样式或加粗，初版简单处理）
-        if para.style.name.startswith('Heading') or any(run.bold for run in para.runs if run.text.strip()):
+        style_name = getattr(getattr(para, "style", None), "name", "") or ""
+        if style_name.startswith('Heading') or any(run.bold for run in para.runs if run.text.strip()):
             paragraphs.append({"text": para.text, "is_header": True})
         else:
             paragraphs.append({"text": para.text, "is_header": False})
 
-    # 尝试提取摘要和关键词 (关键词通常在摘要后面)
-    abstract = ""
-    keywords = ""
     text_str = "\n".join(full_text)
-    
-    # 简单的正则或关键词匹配（中外法学常见格式）
-    if "【摘要】" in text_str:
-        parts = text_str.split("【摘要】", 1)
-        if len(parts) > 1:
-            rest = parts[1]
-            if "【关键词】" in rest:
-                abstract_part, keywords_part = rest.split("【关键词】", 1)
-                abstract = abstract_part.split("\n", 1)[0].strip()
-                keywords = keywords_part.split("\n", 1)[0].strip()
-            else:
-                abstract = rest.split("\n", 1)[0].strip()
+    abstract, keywords = _extract_abstract_and_keywords(text_str)
+    footnotes = _extract_notes_from_docx_xml(file_path, "footnotes")
+    endnotes = _extract_notes_from_docx_xml(file_path, "endnotes")
+    notes = footnotes + endnotes
 
     return {
-        "title": doc.paragraphs[0].text if doc.paragraphs else "",
+        "title": _first_non_empty_paragraph(doc),
         "abstract": abstract,
         "keywords": keywords,
         "body_text": text_str,
         "body_structure": paragraphs,
-        "footnotes_raw": [note.text for note in doc.sections[0].footer.paragraphs] if hasattr(doc, 'sections') and doc.sections else [], # Simplified
+        "footnotes_raw": notes,
         "references_raw": [],
         "author_info": {},
-        "word_count": len(text_str)
+        "word_count": len(re.sub(r"\s+", "", text_str))
     }
 
 def parse_pdf(file_path: Path) -> Dict[str, Any]:
