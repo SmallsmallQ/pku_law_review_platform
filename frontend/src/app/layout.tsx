@@ -31,7 +31,7 @@ export default function RootLayout({
           <ConfigProvider theme={theme} locale={zhCN}>
             <AuthProvider>
               <DocumentTitle />
-              <div className="flex min-h-screen flex-col">
+              <div className="flex flex-1 flex-col">
                 {children}
                 <Footer />
               </div>
