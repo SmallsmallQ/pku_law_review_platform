@@ -1,0 +1,15 @@
+# 环境与密钥（勿提交）
+.env
+*.env
+backend/.env
+
+# 依赖与构建
+node_modules/
+.next/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 存储与本地数据
+backend/storage/
