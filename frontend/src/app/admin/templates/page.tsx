@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Card, Form, Input, Modal, Space, Switch, Table, message } from "antd";
+import { Button, Card, Form, Input, Modal, Popconfirm, Space, Switch, Table, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { adminApi, type RevisionTemplateItem } from "@/services/api";
 
@@ -55,17 +55,37 @@ export default function AdminTemplatesPage() {
       key: "action",
       width: 120,
       render: (_, record) => (
-        <Button
-          type="link"
-          size="small"
-          onClick={() => {
-            setEditing(record);
-            form.setFieldsValue({ name: record.name ?? "", content: record.content ?? "", is_active: record.is_active });
-            setModalOpen(true);
-          }}
-        >
-          编辑
-        </Button>
+        <Space>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => {
+              setEditing(record);
+              form.setFieldsValue({ name: record.name ?? "", content: record.content ?? "", is_active: record.is_active });
+              setModalOpen(true);
+            }}
+          >
+            编辑
+          </Button>
+          <Popconfirm
+            title="确定删除该模板？"
+            okText="删除"
+            cancelText="取消"
+            onConfirm={() => {
+              adminApi
+                .deleteRevisionTemplate(record.id)
+                .then(() => {
+                  message.success("已删除");
+                  load();
+                })
+                .catch((e) => message.error(e?.message || "删除失败"));
+            }}
+          >
+            <Button type="link" size="small" danger>
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
       ),
     },
   ];

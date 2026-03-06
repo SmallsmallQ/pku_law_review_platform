@@ -60,6 +60,7 @@ def create_manuscript(
     abstract: Annotated[str, Form()] = "",
     keywords: Annotated[str, Form()] = "",
     author_info: Annotated[str, Form()] = "{}",
+    section_id: Annotated[int | None, Form()] = None,
     institution: Annotated[str, Form()] = "",
     fund: Annotated[str, Form()] = "",
     contact: Annotated[str, Form()] = "",
@@ -76,7 +77,7 @@ def create_manuscript(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"仅支持 {list(ALLOWED_EXTENSIONS)} 格式",
         )
-    content = file.read()
+    content = file.file.read()
     submit_yes = str(submit).strip().lower() in ("true", "1", "yes")
     status_val = "submitted" if submit_yes else "draft"
 
@@ -100,7 +101,7 @@ def create_manuscript(
 
     supplement_path = None
     if supplement and supplement.filename:
-        supp_content = supplement.read()
+        supp_content = supplement.file.read()
         supplement_path = save_supplement_file(manuscript.id, version_number, supplement.filename, supp_content)
 
     version = ManuscriptVersion(
@@ -214,7 +215,7 @@ def upload_revision(
     ext = "." + (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"仅支持 {list(ALLOWED_EXTENSIONS)} 格式")
-    content = file.read()
+    content = file.file.read()
 
     next_num = db.query(ManuscriptVersion).filter(ManuscriptVersion.manuscript_id == id).count() + 1
     try:

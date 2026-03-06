@@ -3,7 +3,8 @@
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr
-from sqlalchemy import func
+from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.deps import RequireAdmin, get_db
@@ -17,6 +18,13 @@ def _assign_user_id_for_sqlite(db: Session, user: User) -> None:
     """SQLite 下 BIGINT 主键不会自增，这里手动分配。"""
     if db.bind is not None and db.bind.dialect.name == "sqlite":
         user.id = (db.query(func.max(User.id)).scalar() or 0) + 1
+
+
+def _validate_password(password: str) -> None:
+    if len(password) < 8:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="密码至少 8 位")
+    if not any(ch.isalpha() for ch in password) or not any(ch.isdigit() for ch in password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="密码需包含字母和数字")
 
 
 # ----- Users -----
@@ -44,14 +52,16 @@ class UpdateUserBody(BaseModel):
     real_name: str | None = None
     role: str | None = None
     is_active: bool | None = None
+    password: str | None = None
 
 
 @router.get("/users", response_model=dict)
 def list_users(
-    user: User = Depends(RequireAdmin),
+    _user: User = Depends(RequireAdmin),
     db: Session = Depends(get_db),
     role: str | None = Query(None),
     is_active: bool | None = Query(None),
+    keyword: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
@@ -60,6 +70,14 @@ def list_users(
         q = q.filter(User.role == role)
     if is_active is not None:
         q = q.filter(User.is_active == is_active)
+    if keyword:
+        k = f"%{keyword.strip().lower()}%"
+        q = q.filter(
+            or_(
+                func.lower(User.email).like(k),
+                func.lower(func.coalesce(User.real_name, "")).like(k),
+            )
+        )
     total = q.count()
     items = q.order_by(User.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
     return {
@@ -85,12 +103,14 @@ def create_user(
     _user: User = Depends(RequireAdmin),
     db: Session = Depends(get_db),
 ):
-    if db.query(User).filter(User.email == body.email).first():
+    email = str(body.email).strip().lower()
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该邮箱已存在")
     if body.role not in ("author", "editor", "admin"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="角色须为 author / editor / admin")
+    _validate_password(body.password)
     user = User(
-        email=body.email,
+        email=email,
         password_hash=hash_password(body.password),
         real_name=body.real_name,
         role=body.role,
@@ -114,7 +134,7 @@ def create_user(
 def update_user(
     user_id: int,
     body: UpdateUserBody,
-    _user: User = Depends(RequireAdmin),
+    current_user: User = Depends(RequireAdmin),
     db: Session = Depends(get_db),
 ):
     user = db.query(User).filter(User.id == user_id).first()
@@ -125,9 +145,16 @@ def update_user(
     if body.role is not None:
         if body.role not in ("author", "editor", "admin"):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="角色须为 author / editor / admin")
+        if user.id == current_user.id and body.role != "admin":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能将当前管理员账号降级")
         user.role = body.role
     if body.is_active is not None:
+        if user.id == current_user.id and body.is_active is False:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能停用当前登录账号")
         user.is_active = body.is_active
+    if body.password is not None:
+        _validate_password(body.password)
+        user.password_hash = hash_password(body.password)
     db.commit()
     db.refresh(user)
     return AdminUserItem(
@@ -186,9 +213,16 @@ def create_section(
     _user: User = Depends(RequireAdmin),
     db: Session = Depends(get_db),
 ):
-    section = Section(name=body.name, code=body.code, sort_order=body.sort_order)
+    code = body.code.strip() if body.code else None
+    if code and db.query(Section).filter(Section.code == code).first():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="栏目编码已存在")
+    section = Section(name=body.name.strip(), code=code, sort_order=body.sort_order)
     db.add(section)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="栏目编码已存在")
     db.refresh(section)
     return SectionItem(
         id=section.id,
@@ -209,10 +243,19 @@ def update_section(
     section = db.query(Section).filter(Section.id == section_id).first()
     if not section:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="栏目不存在")
-    section.name = body.name
-    section.code = body.code
+    code = body.code.strip() if body.code else None
+    if code:
+        exists = db.query(Section).filter(Section.code == code, Section.id != section_id).first()
+        if exists:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="栏目编码已存在")
+    section.name = body.name.strip()
+    section.code = code
     section.sort_order = body.sort_order
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="栏目编码已存在")
     db.refresh(section)
     return SectionItem(
         id=section.id,
@@ -232,6 +275,9 @@ def delete_section(
     section = db.query(Section).filter(Section.id == section_id).first()
     if not section:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="栏目不存在")
+    has_manuscripts = db.query(Manuscript.id).filter(Manuscript.section_id == section_id).first() is not None
+    if has_manuscripts:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该栏目已被稿件引用，不能删除")
     db.delete(section)
     db.commit()
 
@@ -321,6 +367,19 @@ def update_revision_template(
     )
 
 
+@router.delete("/templates/revision/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_revision_template(
+    template_id: int,
+    _user: User = Depends(RequireAdmin),
+    db: Session = Depends(get_db),
+):
+    t = db.query(RevisionTemplate).filter(RevisionTemplate.id == template_id).first()
+    if not t:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模板不存在")
+    db.delete(t)
+    db.commit()
+
+
 # ----- Config -----
 class ConfigItem(BaseModel):
     key: str
@@ -355,17 +414,23 @@ def update_config(
     _user: User = Depends(RequireAdmin),
     db: Session = Depends(get_db),
 ):
-    if body.items:
+    if body.items is not None:
+        seen_keys: set[str] = set()
         for item in body.items:
             k = item.get("key")
             v = item.get("value")
             if k is None:
                 continue
-            row = db.query(SystemConfig).filter(SystemConfig.key == k).first()
+            key = str(k).strip()
+            if not key:
+                continue
+            seen_keys.add(key)
+            row = db.query(SystemConfig).filter(SystemConfig.key == key).first()
             if row:
                 row.value = v
             else:
-                db.add(SystemConfig(key=k, value=v))
+                db.add(SystemConfig(key=key, value=v))
+        db.query(SystemConfig).filter(~SystemConfig.key.in_(seen_keys)).delete(synchronize_session=False)
         db.commit()
     elif body.key is not None:
         row = db.query(SystemConfig).filter(SystemConfig.key == body.key).first()

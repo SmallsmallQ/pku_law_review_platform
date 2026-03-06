@@ -35,10 +35,19 @@ export default function HeaderBar() {
 
   return (
     <Header className="!bg-white !px-0 !py-0 h-auto">
-      {/* 顶栏 */}
-      <div className="border-b border-[#ebeae6] bg-[#f9f8f5]">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-end gap-4 px-4 py-2">
-          <Input placeholder="站内搜索" allowClear className="mr-auto w-40 max-w-full sm:w-48" aria-label="站内搜索" />
+      <div className="mx-auto max-w-6xl px-4">
+        <div className="flex flex-wrap items-center gap-4 py-3">
+          <Link href="/" className="mr-2 block shrink-0 py-2 text-xl font-bold text-[#8B1538] hover:text-[#70122e]">
+            《中外法学》智能编审系统
+          </Link>
+          <Menu
+            mode="horizontal"
+            selectedKeys={[selectedKey]}
+            items={navItems}
+            className="order-3 w-full !border-0 !min-w-0 sm:order-none sm:flex-1 sm:justify-end [&_.ant-menu-item]:!text-[#333]"
+            style={{ lineHeight: "48px" }}
+          />
+          <Input placeholder="站内搜索" allowClear className="w-40 max-w-full sm:w-48" aria-label="站内搜索" />
           <a
             href="https://www.law.pku.edu.cn/"
             target="_blank"
@@ -71,21 +80,6 @@ export default function HeaderBar() {
               </Link>
             </Space>
           )}
-        </div>
-      </div>
-      {/* 主导航 */}
-      <div className="mx-auto max-w-6xl px-4">
-        <div className="flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-[#8B1538] hover:text-[#70122e] py-4 block">
-            《中外法学》智能编审系统
-          </Link>
-          <Menu
-            mode="horizontal"
-            selectedKeys={[selectedKey]}
-            items={navItems}
-            className="!border-0 !min-w-0 flex-1 justify-end [&_.ant-menu-item]:!text-[#333]"
-            style={{ lineHeight: "64px" }}
-          />
         </div>
       </div>
     </Header>

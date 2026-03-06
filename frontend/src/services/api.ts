@@ -66,7 +66,7 @@ export const authApi = {
   login: (body: { email: string; password: string }) =>
     request<LoginRes>("auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
   me: () => request<User>("auth/me"),
-  updateMe: (body: { real_name?: string; institution?: string }) =>
+  updateMe: (body: { real_name?: string | null; institution?: string | null }) =>
     request<User>("auth/me", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
 };
 
@@ -186,7 +186,7 @@ export interface AdminStats {
 }
 
 export const adminApi = {
-  users: (params?: { role?: string; is_active?: boolean; page?: number; page_size?: number }) =>
+  users: (params?: { role?: string; is_active?: boolean; keyword?: string; page?: number; page_size?: number }) =>
     request<{ items: AdminUserItem[]; total: number }>("admin/users", {
       params: params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])) : undefined,
     }),
@@ -196,7 +196,7 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
-  updateUser: (id: number, body: { real_name?: string; role?: string; is_active?: boolean }) =>
+  updateUser: (id: number, body: { real_name?: string; role?: string; is_active?: boolean; password?: string }) =>
     request<AdminUserItem>(`admin/users/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -232,6 +232,8 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
+  deleteRevisionTemplate: (id: number) =>
+    request<void>(`admin/templates/revision/${id}`, { method: "DELETE" }),
 
   config: () => request<{ items: ConfigItem[]; total: number }>("admin/config"),
   updateConfig: (body: { key?: string; value?: string; items?: { key: string; value: string }[] }) =>

@@ -9,14 +9,30 @@ from app.config import settings
 
 # 请求超时（秒），避免长时间无响应
 LLM_REQUEST_TIMEOUT = 90
+PLACEHOLDER_API_KEYS = {
+    "your-dashscope-api-key",
+    "your_api_key",
+    "changeme",
+}
+
+
+def _normalized_api_key() -> str:
+    """读取并标准化 API Key，过滤常见占位符值。"""
+    key = (getattr(settings, "dashscope_api_key", None) or "").strip()
+    if not key:
+        return ""
+    if key.lower() in PLACEHOLDER_API_KEYS:
+        return ""
+    return key
 
 
 def _client() -> OpenAI | None:
     """返回配置好的 OpenAI 兼容客户端；未配置 API Key 时返回 None。"""
-    if not (getattr(settings, "dashscope_api_key", None) or "").strip():
+    api_key = _normalized_api_key()
+    if not api_key:
         return None
     return OpenAI(
-        api_key=settings.dashscope_api_key.strip(),
+        api_key=api_key,
         base_url=settings.llm_base_url.strip() or "https://dashscope.aliyuncs.com/compatible-mode/v1",
         timeout=LLM_REQUEST_TIMEOUT,
     )
@@ -55,4 +71,4 @@ def chat_completion(
 
 def is_llm_configured() -> bool:
     """是否已配置百炼 API Key（可用于前端判断是否展示 AI 能力）。"""
-    return bool((getattr(settings, "dashscope_api_key", None) or "").strip())
+    return bool(_normalized_api_key())

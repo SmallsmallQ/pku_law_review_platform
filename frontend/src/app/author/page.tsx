@@ -3,22 +3,24 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Alert, Button, Card, Select, Space, Spin, Table, Typography } from "antd";
+import { Alert, Button, Card, Form, Input, Select, Space, Spin, Table, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
 import { STATUS_MAP } from "@/lib/constants";
-import { manuscriptsApi, type ManuscriptListItem } from "@/services/api";
+import { authApi, manuscriptsApi, type ManuscriptListItem } from "@/services/api";
 
 const pageSize = 20;
 
 export default function AuthorCenterPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, setUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [profileForm] = Form.useForm<{ real_name?: string; institution?: string }>();
   const [list, setList] = useState<ManuscriptListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [page, setPage] = useState(1);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -57,10 +59,18 @@ export default function AuthorCenterPage() {
     })();
   }, [user, page, statusFilter, router]);
 
+  useEffect(() => {
+    if (!user) return;
+    profileForm.setFieldsValue({
+      real_name: user.real_name ?? "",
+      institution: user.institution ?? "",
+    });
+  }, [user, profileForm]);
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-[#f9f8f5] flex items-center justify-center">
-        <Spin size="large" tip="加载中…" />
+        <Spin size="large" />
       </div>
     );
   }
@@ -107,10 +117,54 @@ export default function AuthorCenterPage() {
     },
   ];
 
+  const handleSaveProfile = async (values: { real_name?: string; institution?: string }) => {
+    setSavingProfile(true);
+    try {
+      const realName = values.real_name?.trim() ?? "";
+      const institution = values.institution?.trim() ?? "";
+      const updated = await authApi.updateMe({
+        real_name: realName || null,
+        institution: institution || null,
+      });
+      setUser(updated);
+      message.success("个人资料已更新");
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : "更新失败");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f9f8f5]">
       <HeaderBar />
       <main id="main-content" className="mx-auto max-w-5xl px-4 py-8" aria-label="我的稿件">
+        <Card title="个人资料" className="mb-6">
+          <Form form={profileForm} layout="vertical" onFinish={handleSaveProfile}>
+            <Form.Item label="登录邮箱">
+              <Input value={user.email} disabled />
+            </Form.Item>
+            <Form.Item
+              name="real_name"
+              label="姓名"
+              rules={[{ required: true, message: "请输入姓名" }]}
+            >
+              <Input placeholder="请输入姓名" maxLength={100} />
+            </Form.Item>
+            <Form.Item
+              name="institution"
+              label="单位"
+              rules={[{ required: true, message: "请输入单位" }]}
+            >
+              <Input placeholder="请输入单位" maxLength={200} />
+            </Form.Item>
+            <Form.Item className="mb-0">
+              <Button type="primary" htmlType="submit" loading={savingProfile}>
+                保存个人资料
+              </Button>
+            </Form.Item>
+          </Form>
+        </Card>
         <Card
           title="我的稿件"
           extra={

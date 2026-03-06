@@ -15,6 +15,7 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [roleFilter, setRoleFilter] = useState<string>("");
   const [activeFilter, setActiveFilter] = useState<string>("");
+  const [keyword, setKeyword] = useState<string>("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUserItem | null>(null);
@@ -30,6 +31,7 @@ export default function AdminUsersPage() {
         page_size: pageSize,
         ...(roleFilter ? { role: roleFilter } : {}),
         ...(activeFilter !== "" ? { is_active: activeFilter === "true" } : {}),
+        ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
       })
       .then((res) => {
         setList(res.items);
@@ -39,7 +41,7 @@ export default function AdminUsersPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => load(), [page, roleFilter, activeFilter]);
+  useEffect(() => load(), [page, roleFilter, activeFilter, keyword]);
 
   const handleCreate = (values: { email: string; password: string; real_name?: string; role: string }) => {
     setSubmitting(true);
@@ -55,11 +57,15 @@ export default function AdminUsersPage() {
       .finally(() => setSubmitting(false));
   };
 
-  const handleUpdate = (values: { real_name?: string; role?: string; is_active?: boolean }) => {
+  const handleUpdate = (values: { real_name?: string; role?: string; is_active?: boolean; password?: string }) => {
     if (!editingUser) return;
     setSubmitting(true);
+    const payload = {
+      ...values,
+      password: values.password?.trim() ? values.password.trim() : undefined,
+    };
     adminApi
-      .updateUser(editingUser.id, values)
+      .updateUser(editingUser.id, payload)
       .then(() => {
         message.success("更新成功");
         setEditModalOpen(false);
@@ -107,12 +113,22 @@ export default function AdminUsersPage() {
       <h1 className="text-xl font-bold text-[#333] mb-4">用户管理</h1>
       <Card size="small" className="mb-4">
         <Space wrap>
-          <Select placeholder="角色" allowClear value={roleFilter || undefined} onChange={setRoleFilter} style={{ width: 100 }}>
+          <Input
+            placeholder="搜索邮箱/姓名"
+            allowClear
+            value={keyword}
+            onChange={(e) => {
+              setPage(1);
+              setKeyword(e.target.value);
+            }}
+            style={{ width: 220 }}
+          />
+          <Select placeholder="角色" allowClear value={roleFilter || undefined} onChange={(v) => { setPage(1); setRoleFilter(v ?? ""); }} style={{ width: 100 }}>
             <Select.Option value="author">作者</Select.Option>
             <Select.Option value="editor">编辑</Select.Option>
             <Select.Option value="admin">管理员</Select.Option>
           </Select>
-          <Select placeholder="状态" allowClear value={activeFilter || undefined} onChange={setActiveFilter} style={{ width: 100 }}>
+          <Select placeholder="状态" allowClear value={activeFilter || undefined} onChange={(v) => { setPage(1); setActiveFilter(v ?? ""); }} style={{ width: 100 }}>
             <Select.Option value="true">启用</Select.Option>
             <Select.Option value="false">停用</Select.Option>
           </Select>
@@ -157,7 +173,7 @@ export default function AdminUsersPage() {
         </Form>
       </Modal>
 
-      <Modal title="编辑用户" open={editModalOpen} onCancel={() => { setEditModalOpen(false); setEditingUser(null); }} footer={null} destroyOnClose>
+      <Modal title="编辑用户" open={editModalOpen} onCancel={() => { setEditModalOpen(false); setEditingUser(null); editForm.resetFields(); }} footer={null} destroyOnClose>
         <Form form={editForm} layout="vertical" onFinish={handleUpdate}>
           <Form.Item name="real_name" label="姓名">
             <Input />
@@ -174,6 +190,14 @@ export default function AdminUsersPage() {
               <Select.Option value={true}>启用</Select.Option>
               <Select.Option value={false}>停用</Select.Option>
             </Select>
+          </Form.Item>
+          <Form.Item
+            name="password"
+            label="重置密码（可选）"
+            rules={[{ min: 8, message: "至少 8 位" }]}
+            extra="需包含字母和数字"
+          >
+            <Input.Password placeholder="留空则不修改" />
           </Form.Item>
           <Form.Item>
             <Space>

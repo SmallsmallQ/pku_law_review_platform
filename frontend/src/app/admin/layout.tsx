@@ -25,13 +25,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (loading) return;
     if (!user || user.role !== "admin") {
-      router.push("/");
+      router.push(`/login?returnUrl=${encodeURIComponent(pathname || "/admin")}`);
       return;
     }
-  }, [user, loading, router]);
+  }, [user, loading, pathname, router]);
 
   if (loading) return null;
-  if (user && user.role !== "admin") return null;
+  if (!user || user.role !== "admin") return null;
 
   const selectedKey = pathname === "/admin" ? "/admin" : pathname;
 
