@@ -1,7 +1,11 @@
 """
 应用配置。从环境变量读取，便于本地与部署一致。
 """
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
+
+DEFAULT_SQLITE_PATH = (Path(__file__).resolve().parent.parent / "law_review.db").as_posix()
 
 
 class Settings(BaseSettings):
@@ -11,7 +15,7 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # 数据库。默认 SQLite 便于本地无 PostgreSQL 时直接跑通；生产请设 DATABASE_URL 为 PostgreSQL
-    database_url: str = "sqlite:///./law_review.db"
+    database_url: str = f"sqlite:///{DEFAULT_SQLITE_PATH}"
     # 设为 true 时强制使用 SQLite（忽略 DATABASE_URL），便于本地未启 PostgreSQL 时跑通
     use_sqlite: bool = False
 

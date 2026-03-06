@@ -1,13 +1,22 @@
 """
 SQLAlchemy 声明基类与表结构创建。初版同步引擎（需 psycopg2，勿用 asyncpg）。
 """
+from pathlib import Path
+
 from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.config import settings
 
 # 同步脚本与 Session 必须用同步驱动；若 DATABASE_URL 为 postgresql+asyncpg 则改为 postgresql（psycopg2）
-_sync_url = "sqlite:///./law_review.db" if getattr(settings, "use_sqlite", False) else settings.database_url
+if getattr(settings, "use_sqlite", False):
+    if str(settings.database_url).startswith("sqlite"):
+        _sync_url = settings.database_url
+    else:
+        fallback_sqlite_path = (Path(__file__).resolve().parent.parent.parent / "law_review.db").as_posix()
+        _sync_url = f"sqlite:///{fallback_sqlite_path}"
+else:
+    _sync_url = settings.database_url
 if "+asyncpg" in _sync_url:
     _sync_url = _sync_url.replace("postgresql+asyncpg", "postgresql", 1)
 
