@@ -7,6 +7,7 @@ import { Alert, Breadcrumb, Button, Card, Descriptions, List, Space, Spin, Tag, 
 import type { BreadcrumbItemType } from "antd/es/breadcrumb/Breadcrumb";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
+import MarkdownRenderer from "@/components/ui/MarkdownRenderer";
 import { STATUS_MAP } from "@/lib/constants";
 import { manuscriptsApi } from "@/services/api";
 
@@ -149,7 +150,7 @@ export default function AuthorManuscriptDetailPage() {
                     renderItem={(r, i) => (
                       <List.Item>
                         <div>
-                          <p className="mb-0">{r.comment || "—"}</p>
+                          {r.comment ? <MarkdownRenderer content={r.comment} /> : <p className="mb-0">—</p>}
                           <Typography.Text type="secondary" className="text-xs">
                             {r.created_at?.slice(0, 19)}
                           </Typography.Text>

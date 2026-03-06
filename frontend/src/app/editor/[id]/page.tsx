@@ -19,6 +19,7 @@ import {
 import type { BreadcrumbItemType } from "antd/es/breadcrumb/Breadcrumb";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
+import MarkdownRenderer from "@/components/ui/MarkdownRenderer";
 import { STATUS_MAP } from "@/lib/constants";
 import { editorApi } from "@/services/api";
 
@@ -221,8 +222,8 @@ export default function EditorManuscriptDetailPage() {
                   <Typography.Text type="secondary" className="text-xs block mb-2">
                     模型：{aiReport.model}
                   </Typography.Text>
-                  <div className="max-h-[420px] overflow-y-auto rounded border border-[#f0f0f0] bg-[#fafafa] p-4 text-sm text-[#333] whitespace-pre-wrap">
-                    {aiReport.content}
+                  <div className="max-h-[420px] overflow-y-auto rounded border border-[#f0f0f0] bg-[#fafafa] p-4">
+                    <MarkdownRenderer content={aiReport.content} />
                   </div>
                 </Card>
               )}
@@ -235,7 +236,11 @@ export default function EditorManuscriptDetailPage() {
                       <List.Item>
                         <div>
                           <p className="mb-0">{String(a.action_type)}：{String(a.from_status)} → {String(a.to_status)}</p>
-                          {a.comment != null && <Typography.Text type="secondary" className="block mt-1">{String(a.comment)}</Typography.Text>}
+                          {a.comment != null && (
+                            <div className="mt-1 rounded bg-[#fafafa] px-3 py-2">
+                              <MarkdownRenderer content={String(a.comment)} />
+                            </div>
+                          )}
                           <Typography.Text type="secondary" className="text-xs block mt-1">{String(a.created_at ?? "").slice(0, 19)}</Typography.Text>
                         </div>
                       </List.Item>

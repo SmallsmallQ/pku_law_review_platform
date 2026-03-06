@@ -38,16 +38,23 @@ export default function HomePage() {
 
       <section className="relative min-h-[320px] w-full overflow-hidden bg-[#8B1538] md:min-h-[360px]" aria-label="期刊标题与简介">
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
           style={{
             backgroundImage:
               "url(/banner.jpg), linear-gradient(135deg, #8B1538 0%, #5c0e26 50%, #70122e 100%)",
           }}
           aria-hidden
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#8B1538]/72 via-[#8B1538]/58 to-[#5f1029]/74" aria-hidden />
-        <div className="absolute inset-0 bg-[#65122c]/18" aria-hidden />
-        <div className="relative mx-auto flex min-h-[320px] max-w-6xl flex-col items-center justify-center px-6 py-16 text-center text-white md:min-h-[360px]">
+        <div
+          className="absolute inset-0 z-10"
+          style={{
+            background:
+              "linear-gradient(90deg, rgba(139,21,56,0.70) 0%, rgba(139,21,56,0.55) 52%, rgba(95,16,41,0.74) 100%)",
+          }}
+          aria-hidden
+        />
+        <div className="absolute inset-0 z-10 bg-[rgba(101,18,44,0.22)]" aria-hidden />
+        <div className="relative z-20 mx-auto flex min-h-[320px] max-w-6xl flex-col items-center justify-center px-6 py-16 text-center text-white md:min-h-[360px]">
           <Title level={1} className="!mb-3 !text-white !tracking-tight drop-shadow md:!text-4xl lg:!text-5xl">
             《中外法学》
           </Title>

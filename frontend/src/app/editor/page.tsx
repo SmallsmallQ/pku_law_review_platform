@@ -21,6 +21,7 @@ import {
 } from "antd";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
+import MarkdownRenderer from "@/components/ui/MarkdownRenderer";
 import { STATUS_MAP } from "@/lib/constants";
 import { editorApi, type EditorManuscriptItem } from "@/services/api";
 
@@ -149,7 +150,11 @@ export default function EditorWorkbenchPage() {
             <div className="text-sm text-[#333]">
               {String(a.action_type)}: {String(a.from_status ?? "-")} → {String(a.to_status ?? "-")}
             </div>
-            {a.comment ? <div className="text-xs text-[#666] mt-1">{String(a.comment)}</div> : null}
+            {a.comment ? (
+              <div className="text-xs text-[#666] mt-1 rounded bg-[#fafafa] px-3 py-2">
+                <MarkdownRenderer content={String(a.comment)} />
+              </div>
+            ) : null}
             <div className="text-xs text-[#999] mt-1">{String(a.created_at ?? "").slice(0, 19)}</div>
           </div>
         ),
@@ -269,8 +274,8 @@ export default function EditorWorkbenchPage() {
                 {aiError ? <Alert type="error" showIcon message={aiError} /> : null}
                 {aiReport ? (
                   <Card size="small" title={`AI 初审报告${aiReport.model ? `（${aiReport.model}）` : ""}`}>
-                    <div className="max-h-[320px] overflow-y-auto whitespace-pre-wrap text-sm text-[#333] leading-6">
-                      {aiReport.content}
+                    <div className="max-h-[320px] overflow-y-auto">
+                      <MarkdownRenderer content={aiReport.content} />
                     </div>
                   </Card>
                 ) : null}

@@ -4,5 +4,6 @@ export { default as SectionTitleCentered } from "./SectionTitleCentered";
 export { default as RedLinkCard } from "./RedLinkCard";
 export { default as QuickActionButton } from "./QuickActionButton";
 export { default as DataTable } from "./DataTable";
+export { default as MarkdownRenderer } from "./MarkdownRenderer";
 export { ButtonPrimary, ButtonOutline, ButtonDanger, ButtonGhost } from "./Button";
 export { FormField, Input, Textarea, Select } from "./FormField";
