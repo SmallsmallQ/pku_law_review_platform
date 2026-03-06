@@ -71,7 +71,7 @@ export default function AuthorCenterPage() {
 
   if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-[#f9f8f5] flex items-center justify-center">
+      <div className="flex min-h-[45vh] items-center justify-center bg-[#f5f6f8]">
         <Spin size="large" />
       </div>
     );
@@ -138,7 +138,7 @@ export default function AuthorCenterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f9f8f5]">
+    <div className="bg-[#f5f6f8]">
       <HeaderBar />
       <main id="main-content" className="mx-auto max-w-5xl px-4 py-8" aria-label="我的稿件">
         <Card title="个人资料" className="mb-6">

@@ -20,6 +20,7 @@ import type { BreadcrumbItemType } from "antd/es/breadcrumb/Breadcrumb";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
 import MarkdownRenderer from "@/components/ui/MarkdownRenderer";
+import TypewriterMarkdown from "@/components/ui/TypewriterMarkdown";
 import { STATUS_MAP } from "@/lib/constants";
 import { editorApi } from "@/services/api";
 
@@ -126,7 +127,7 @@ export default function EditorManuscriptDetailPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#fafafa]">
+    <div className="bg-[#f5f6f8]">
       <HeaderBar />
       <main className="mx-auto max-w-3xl px-4 py-8">
         <Card>
@@ -222,8 +223,8 @@ export default function EditorManuscriptDetailPage() {
                   <Typography.Text type="secondary" className="text-xs block mb-2">
                     模型：{aiReport.model}
                   </Typography.Text>
-                  <div className="max-h-[420px] overflow-y-auto rounded border border-[#f0f0f0] bg-[#fafafa] p-4">
-                    <MarkdownRenderer content={aiReport.content} />
+                  <div className="h-[52vh] min-h-[320px] max-h-[560px] overflow-y-auto pr-1">
+                    <TypewriterMarkdown content={aiReport.content} />
                   </div>
                 </Card>
               )}

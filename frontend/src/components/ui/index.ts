@@ -5,5 +5,6 @@ export { default as RedLinkCard } from "./RedLinkCard";
 export { default as QuickActionButton } from "./QuickActionButton";
 export { default as DataTable } from "./DataTable";
 export { default as MarkdownRenderer } from "./MarkdownRenderer";
+export { default as TypewriterMarkdown } from "./TypewriterMarkdown";
 export { ButtonPrimary, ButtonOutline, ButtonDanger, ButtonGhost } from "./Button";
 export { FormField, Input, Textarea, Select } from "./FormField";

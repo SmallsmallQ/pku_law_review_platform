@@ -69,6 +69,8 @@ def editor_manuscript_list(
         )
     total = q.count()
     items = q.order_by(Manuscript.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    report_content, report_model = _normalize_report_payload(report_obj)
+
     return {
         "items": [
             EditorManuscriptListItem(
@@ -146,8 +148,8 @@ def editor_manuscript_detail(
             "parsed_at": parsed.created_at.isoformat() if parsed.created_at else None,
         } if parsed else None,
         "report": {
-            "content": report_obj.content.get("text") if isinstance(report_obj.content, dict) else report_obj.content,
-            "model": report_obj.content.get("model") if isinstance(report_obj.content, dict) else None,
+            "content": report_content,
+            "model": report_model,
             "generated_at": report_obj.generated_at.isoformat() if report_obj.generated_at else None,
         } if report_obj else None,
         "citation_issues": [],
@@ -219,6 +221,20 @@ class AiReviewResponse(BaseModel):
     model: str
 
 
+def _normalize_report_payload(report_obj: ReviewReport | None) -> tuple[str, str]:
+    """标准化报告内容，避免 JSON 结构异常导致响应序列化报错。"""
+    if not report_obj:
+        return "", settings.llm_model
+    raw = report_obj.content
+    if isinstance(raw, dict):
+        content = raw.get("text", "")
+        model = raw.get("model") or settings.llm_model
+    else:
+        content = raw
+        model = settings.llm_model
+    return str(content or ""), str(model or settings.llm_model)
+
+
 @router.post("/manuscripts/{id}/ai-review", response_model=AiReviewResponse)
 def editor_ai_review(
     id: int,
@@ -237,16 +253,21 @@ def editor_ai_review(
     if not m.current_version_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该稿件尚无文件版本")
 
-    report = generate_full_ai_report(db, id, m.current_version_id)
+    try:
+        report = generate_full_ai_report(db, id, m.current_version_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"生成 AI 报告失败: {e!s}",
+        )
+
     if not report:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="生成 AI 报告失败，请检查大模型配置或解析状态",
         )
-    
-    content = report.content.get("text") if isinstance(report.content, dict) else report.content
-    model = report.content.get("model") if isinstance(report.content, dict) else settings.llm_model
-    
+
+    content, model = _normalize_report_payload(report)
     return AiReviewResponse(content=content, model=model)
 
 

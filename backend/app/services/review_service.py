@@ -74,6 +74,7 @@ def generate_full_ai_report(db: Session, manuscript_id: int, version_id: int) ->
         return None
 
     # 构建 Prompt
+    today_str = datetime.now().strftime("%Y-%m-%d")
     title = parsed.title or m.title or "（无标题）"
     abstract = parsed.abstract or "（未提取到摘要）"
     keywords = parsed.keywords or "（未提取到关键词）"
@@ -94,6 +95,7 @@ def generate_full_ai_report(db: Session, manuscript_id: int, version_id: int) ->
     footnotes_preview, footnotes_is_clipped = _clip_text_for_review(footnotes_text, MAX_FOOTNOTES_CHARS_FOR_REVIEW)
     
     manuscript_context = f"""
+系统日期：{today_str}
 稿件编号：{m.manuscript_no}
 标题：{title}
 摘要：{abstract}

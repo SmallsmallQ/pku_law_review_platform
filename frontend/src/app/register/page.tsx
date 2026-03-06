@@ -44,7 +44,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f9f8f5]">
+    <div className="bg-[#f5f6f8]">
       <HeaderBar />
       <div className="mx-auto max-w-md px-4 py-12">
         <Card>

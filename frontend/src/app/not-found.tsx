@@ -6,7 +6,7 @@ import HeaderBar from "@/components/HeaderBar";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col">
+    <div className="min-h-screen bg-[#f5f6f8] flex flex-col">
       <HeaderBar />
       <main className="flex-1 flex items-center justify-center px-4">
         <Result

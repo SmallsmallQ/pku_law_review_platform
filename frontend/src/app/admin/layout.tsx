@@ -37,7 +37,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const selectedKey = pathname === "/admin" ? "/admin" : pathname;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f9f8f5]">
+    <div className="flex flex-col bg-[#f5f6f8]">
       <HeaderBar />
       <Layout className="flex-1 mx-auto w-full max-w-6xl px-4 py-4">
         <div className="flex gap-6 w-full">

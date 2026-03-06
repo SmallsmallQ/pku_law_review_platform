@@ -77,7 +77,7 @@ export default function AuthorManuscriptDetailPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#fafafa]">
+    <div className="bg-[#f5f6f8]">
       <HeaderBar />
       <main className="mx-auto max-w-2xl px-4 py-8">
         <Card>

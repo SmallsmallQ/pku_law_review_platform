@@ -22,6 +22,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
 import MarkdownRenderer from "@/components/ui/MarkdownRenderer";
+import TypewriterMarkdown from "@/components/ui/TypewriterMarkdown";
 import { STATUS_MAP } from "@/lib/constants";
 import { editorApi, type EditorManuscriptItem } from "@/services/api";
 
@@ -164,7 +165,7 @@ export default function EditorWorkbenchPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#f9f8f5] flex items-center justify-center">
+      <div className="flex min-h-[45vh] items-center justify-center bg-[#f5f6f8]">
         <Spin size="large" />
       </div>
     );
@@ -172,7 +173,7 @@ export default function EditorWorkbenchPage() {
   if (!user || (user.role !== "editor" && user.role !== "admin")) return null;
 
   return (
-    <div className="min-h-screen bg-[#f9f8f5]">
+    <div className="bg-[#f5f6f8]">
       <HeaderBar />
       <main className="mx-auto max-w-[1500px] px-4 py-6">
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(420px,1fr)_380px]">
@@ -273,11 +274,14 @@ export default function EditorWorkbenchPage() {
 
                 {aiError ? <Alert type="error" showIcon message={aiError} /> : null}
                 {aiReport ? (
-                  <Card size="small" title={`AI 初审报告${aiReport.model ? `（${aiReport.model}）` : ""}`}>
-                    <div className="max-h-[320px] overflow-y-auto">
-                      <MarkdownRenderer content={aiReport.content} />
+                  <div className="rounded border border-[#ececec] p-3 overflow-hidden">
+                    <div className="mb-2 text-sm font-medium text-[#333]">
+                      AI 初审报告{aiReport.model ? `（${aiReport.model}）` : ""}
                     </div>
-                  </Card>
+                    <div className="h-[52vh] min-h-[320px] max-h-[560px] overflow-y-auto pr-1">
+                      <TypewriterMarkdown content={aiReport.content} />
+                    </div>
+                  </div>
                 ) : null}
               </Space>
             )}

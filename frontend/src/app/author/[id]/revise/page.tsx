@@ -60,7 +60,7 @@ export default function AuthorRevisePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#fafafa]">
+    <div className="bg-[#f5f6f8]">
       <HeaderBar />
       <main className="mx-auto max-w-lg px-4 py-8">
         <Card>

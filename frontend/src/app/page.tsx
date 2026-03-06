@@ -33,7 +33,7 @@ export default function HomePage() {
   const { user } = useAuth();
 
   return (
-    <div className="bg-white">
+    <div className="bg-[#f5f6f8]">
       <HeaderBar />
 
       <section className="relative min-h-[320px] w-full overflow-hidden bg-[#8B1538] md:min-h-[360px]" aria-label="期刊标题与简介">

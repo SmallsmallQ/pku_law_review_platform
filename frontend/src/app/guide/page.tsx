@@ -8,7 +8,7 @@ const { Title, Paragraph } = Typography;
 
 export default function GuidePage() {
   return (
-    <div className="min-h-screen bg-[#f9f8f5]">
+    <div className="bg-[#f5f6f8]">
       <HeaderBar />
       <main className="mx-auto max-w-3xl px-4 py-8">
         <Card>

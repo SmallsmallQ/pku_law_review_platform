@@ -10,7 +10,7 @@ export default function PageContainer({
   maxWidth?: string;
 }) {
   return (
-    <div className={`min-h-screen bg-[#f9f8f5] ${className}`}>
+    <div className={`bg-[#f5f6f8] ${className}`}>
       {children}
     </div>
   );
