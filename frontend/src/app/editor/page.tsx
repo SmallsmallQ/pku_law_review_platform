@@ -1,26 +1,89 @@
 "use client";
 
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Alert, Button, Card, Select, Space, Spin, Table, Tabs, Typography } from "antd";
-import type { ColumnsType } from "antd/es/table";
+import Link from "next/link";
+import {
+  Alert,
+  Button,
+  Card,
+  Descriptions,
+  Empty,
+  Input,
+  List,
+  Select,
+  Space,
+  Spin,
+  Tag,
+  Timeline,
+  Typography,
+  message,
+} from "antd";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
 import { STATUS_MAP } from "@/lib/constants";
 import { editorApi, type EditorManuscriptItem } from "@/services/api";
 
-const pageSize = 20;
+const { TextArea } = Input;
 
 export default function EditorWorkbenchPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [list, setList] = useState<EditorManuscriptItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
+  const [loadingList, setLoadingList] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [keyword, setKeyword] = useState<string>("");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [revisionComment, setRevisionComment] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+  const [aiReviewLoading, setAiReviewLoading] = useState(false);
+  const [aiReport, setAiReport] = useState<{ content: string; model: string } | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const loadList = useCallback(async () => {
+    setLoadingList(true);
+    try {
+      const res = await editorApi.manuscripts({
+        page: 1,
+        page_size: 100,
+        ...(statusFilter ? { status: statusFilter } : {}),
+        ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+      });
+      setList(res.items);
+      if (res.items.length === 0) {
+        setSelectedId(null);
+        setDetail(null);
+        return;
+      }
+      if (!selectedId || !res.items.some((i) => i.id === selectedId)) {
+        setSelectedId(res.items[0].id);
+      }
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : "加载稿件失败");
+      setList([]);
+    } finally {
+      setLoadingList(false);
+    }
+  }, [statusFilter, keyword, selectedId]);
+
+  const loadDetail = useCallback(async (id: number) => {
+    setLoadingDetail(true);
+    try {
+      const d = await editorApi.manuscriptDetail(id);
+      setDetail(d as Record<string, unknown>);
+      const report = (d as any).report;
+      setAiReport(report ? { content: String(report.content ?? ""), model: String(report.model ?? "") } : null);
+      setAiError(null);
+    } catch (e) {
+      setDetail(null);
+      setAiReport(null);
+      message.error(e instanceof Error ? e.message : "加载详情失败");
+    } finally {
+      setLoadingDetail(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -28,25 +91,71 @@ export default function EditorWorkbenchPage() {
       router.push("/");
       return;
     }
-    (async () => {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        const res = await editorApi.manuscripts({
-          page,
-          page_size: pageSize,
-          ...(statusFilter ? { status: statusFilter } : {}),
-        });
-        setList(res.items);
-        setTotal(res.total);
-      } catch (e) {
-        setList([]);
-        setLoadError(e instanceof Error ? e.message : "加载失败，请刷新重试");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [user, authLoading, page, statusFilter, router]);
+    loadList();
+  }, [user, authLoading, router, loadList]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    loadDetail(selectedId);
+  }, [selectedId, loadDetail]);
+
+  const runAction = async (actionType: string) => {
+    if (!selectedId) return;
+    setActionLoading(true);
+    try {
+      await editorApi.action(selectedId, {
+        action_type: actionType,
+        comment: actionType === "revision_request" ? (revisionComment.trim() || undefined) : undefined,
+      });
+      message.success("操作成功");
+      if (actionType === "revision_request") setRevisionComment("");
+      await loadList();
+      await loadDetail(selectedId);
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : "操作失败");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const runAiReview = async () => {
+    if (!selectedId) return;
+    setAiReviewLoading(true);
+    setAiError(null);
+    try {
+      const res = await editorApi.generateAiReview(selectedId);
+      setAiReport(res);
+      message.success("AI 初审报告已生成");
+      await loadDetail(selectedId);
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "生成失败");
+    } finally {
+      setAiReviewLoading(false);
+    }
+  };
+
+  const manuscript = detail?.manuscript as Record<string, unknown> | undefined;
+  const currentVersion = detail?.current_version as Record<string, unknown> | undefined;
+  const parsed = detail?.parsed as Record<string, unknown> | undefined;
+  const editorActions = (detail?.editor_actions as Record<string, unknown>[]) || [];
+  const status = manuscript?.status as string | undefined;
+
+  const timelineItems = useMemo(
+    () =>
+      editorActions.map((a) => ({
+        color: "gray",
+        children: (
+          <div>
+            <div className="text-sm text-[#333]">
+              {String(a.action_type)}: {String(a.from_status ?? "-")} → {String(a.to_status ?? "-")}
+            </div>
+            {a.comment ? <div className="text-xs text-[#666] mt-1">{String(a.comment)}</div> : null}
+            <div className="text-xs text-[#999] mt-1">{String(a.created_at ?? "").slice(0, 19)}</div>
+          </div>
+        ),
+      })),
+    [editorActions]
+  );
 
   if (authLoading) {
     return (
@@ -55,105 +164,163 @@ export default function EditorWorkbenchPage() {
       </div>
     );
   }
-  if (user && user.role !== "editor" && user.role !== "admin") return null;
-
-  const columns: ColumnsType<EditorManuscriptItem> = [
-    { title: "稿件编号", dataIndex: "manuscript_no", key: "manuscript_no", width: 120 },
-    {
-      title: "标题",
-      dataIndex: "title",
-      key: "title",
-      ellipsis: true,
-      render: (t: string) => <span className="max-w-xs truncate block">{t}</span>,
-    },
-    {
-      title: "状态",
-      dataIndex: "status",
-      key: "status",
-      width: 100,
-      render: (s: string) => (
-        <span className="rounded bg-[#f0f0f0] px-2 py-0.5 text-xs text-[#555]">
-          {STATUS_MAP[s] ?? s}
-        </span>
-      ),
-    },
-    { title: "投稿人 ID", dataIndex: "submitted_by", key: "submitted_by", width: 100 },
-    {
-      title: "投稿时间",
-      dataIndex: "created_at",
-      key: "created_at",
-      width: 170,
-      render: (v: string) => v?.slice(0, 19) ?? "",
-    },
-    {
-      title: "操作",
-      key: "actions",
-      width: 80,
-      render: (_, r) => <Link href={`/editor/${r.id}`}>详情</Link>,
-    },
-  ];
-
-  const quickFilters = [
-    { key: "", label: "全部" },
-    { key: "submitted", label: "已投稿" },
-    { key: "under_review", label: "初审中" },
-    { key: "revision_requested", label: "待退修" },
-    { key: "revised_submitted", label: "已提交修订" },
-    { key: "accepted", label: "录用" },
-    { key: "rejected", label: "退稿" },
-  ];
+  if (!user || (user.role !== "editor" && user.role !== "admin")) return null;
 
   return (
     <div className="min-h-screen bg-[#f9f8f5]">
       <HeaderBar />
-      <main id="main-content" className="mx-auto max-w-5xl px-4 py-8" aria-label="编辑工作台">
-        <Card
-          title="编辑工作台"
-          extra={
-            <Space align="center">
-              <Typography.Text type="secondary">状态筛选：</Typography.Text>
-              <Select
-                value={statusFilter || undefined}
-                onChange={(v) => {
-                  setStatusFilter(v || "");
-                  setPage(1);
-                }}
-                placeholder="全部"
-                style={{ width: 120 }}
+      <main className="mx-auto max-w-[1500px] px-4 py-6">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(420px,1fr)_380px]">
+          <Card
+            size="small"
+            title="待审稿件"
+            extra={
+              <Button size="small" onClick={loadList}>
+                刷新
+              </Button>
+            }
+          >
+            <Space direction="vertical" className="w-full mb-3">
+              <Input
+                placeholder="搜索编号/标题"
                 allowClear
-                options={Object.entries(STATUS_MAP).map(([k, v]) => ({ label: v, value: k }))}
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                onPressEnter={loadList}
+              />
+              <Select
+                placeholder="按状态筛选"
+                allowClear
+                value={statusFilter || undefined}
+                onChange={(v) => setStatusFilter(v ?? "")}
+                options={Object.entries(STATUS_MAP).map(([value, label]) => ({ value, label }))}
               />
             </Space>
-          }
-        >
-          <Tabs
-            activeKey={statusFilter}
-            onChange={(k) => { setStatusFilter(k ?? ""); setPage(1); }}
-            className="mb-4"
-            items={quickFilters.map((f) => ({ key: f.key, label: f.label }))}
-          />
-          {loadError && (
-            <Alert message={loadError} type="warning" showIcon className="mb-4" action={<Button size="small" onClick={() => window.location.reload()}>刷新</Button>} />
-          )}
-          <Table<EditorManuscriptItem>
-            rowKey="id"
-            columns={columns}
-            dataSource={list}
-            loading={loading}
-            scroll={{ x: "max-content" }}
-            pagination={{
-              current: page,
-              pageSize,
-              total,
-              showSizeChanger: false,
-              showTotal: (t) => `共 ${t} 条`,
-              onChange: setPage,
-            }}
-            locale={{
-              emptyText: "暂无稿件，请等待作者投稿",
-            }}
-          />
-        </Card>
+            {loadingList ? (
+              <div className="py-10 text-center">
+                <Spin />
+              </div>
+            ) : (
+              <List
+                size="small"
+                dataSource={list}
+                locale={{ emptyText: <Empty description="暂无稿件" /> }}
+                renderItem={(item) => (
+                  <List.Item
+                    className={`cursor-pointer rounded px-2 ${selectedId === item.id ? "bg-[#f6eef1]" : "hover:bg-[#fafafa]"}`}
+                    onClick={() => setSelectedId(item.id)}
+                  >
+                    <div className="w-full">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-[#666]">{item.manuscript_no}</span>
+                        <Tag>{STATUS_MAP[item.status] ?? item.status}</Tag>
+                      </div>
+                      <div className="text-sm text-[#333] mt-1">{item.title}</div>
+                    </div>
+                  </List.Item>
+                )}
+              />
+            )}
+          </Card>
+
+          <Card size="small" title="审稿意见与操作">
+            {!selectedId ? (
+              <Empty description="请先在左侧选择稿件" />
+            ) : loadingDetail ? (
+              <div className="py-16 text-center">
+                <Spin />
+              </div>
+            ) : (
+              <Space direction="vertical" className="w-full" size="middle">
+                <div className="rounded border border-[#ececec] p-3">
+                  <div className="text-sm text-[#666] mb-1">当前稿件</div>
+                  <div className="font-medium text-[#333]">{String(manuscript?.title ?? "—")}</div>
+                  <div className="text-xs text-[#888] mt-1">{String(manuscript?.manuscript_no ?? "")}</div>
+                </div>
+
+                <TextArea
+                  rows={7}
+                  value={revisionComment}
+                  onChange={(e) => setRevisionComment(e.target.value)}
+                  placeholder="在此填写退修意见（点击“提交退修”时发送给作者）"
+                />
+
+                <Space wrap>
+                  <Button onClick={() => runAction("revision_request")} loading={actionLoading}>
+                    提交退修
+                  </Button>
+                  <Button danger onClick={() => runAction("reject")} loading={actionLoading}>
+                    退稿
+                  </Button>
+                  <Button
+                    type="primary"
+                    className="!bg-[#8B1538] hover:!bg-[#70122e]"
+                    onClick={() => runAction("accept")}
+                    loading={actionLoading}
+                  >
+                    录用
+                  </Button>
+                  <Button type="dashed" onClick={runAiReview} loading={aiReviewLoading}>
+                    生成 AI 初审报告
+                  </Button>
+                  <Link href={`/editor/${selectedId}`}>打开完整详情页</Link>
+                </Space>
+
+                {aiError ? <Alert type="error" showIcon message={aiError} /> : null}
+                {aiReport ? (
+                  <Card size="small" title={`AI 初审报告${aiReport.model ? `（${aiReport.model}）` : ""}`}>
+                    <div className="max-h-[320px] overflow-y-auto whitespace-pre-wrap text-sm text-[#333] leading-6">
+                      {aiReport.content}
+                    </div>
+                  </Card>
+                ) : null}
+              </Space>
+            )}
+          </Card>
+
+          <Card size="small" title="流程与详情">
+            {!selectedId ? (
+              <Empty description="请先在左侧选择稿件" />
+            ) : loadingDetail ? (
+              <div className="py-16 text-center">
+                <Spin />
+              </div>
+            ) : (
+              <Space direction="vertical" className="w-full" size="middle">
+                <Descriptions column={1} size="small" bordered>
+                  <Descriptions.Item label="稿件编号">{String(manuscript?.manuscript_no ?? "—")}</Descriptions.Item>
+                  <Descriptions.Item label="状态">
+                    <Tag>{STATUS_MAP[status ?? ""] ?? status}</Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="投稿人">{String(manuscript?.submitted_by ?? "—")}</Descriptions.Item>
+                  <Descriptions.Item label="当前版本">
+                    {currentVersion ? (
+                      <Space>
+                        <span>
+                          v{String(currentVersion.version_number)} / {String(currentVersion.file_name_original ?? "")}
+                        </span>
+                        <a href={editorApi.downloadUrl(selectedId, Number(currentVersion.id))} target="_blank" rel="noopener noreferrer">
+                          下载
+                        </a>
+                      </Space>
+                    ) : (
+                      "—"
+                    )}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="解析摘要">{String(parsed?.abstract || "未识别")}</Descriptions.Item>
+                  <Descriptions.Item label="关键词">{String(parsed?.keywords || "未识别")}</Descriptions.Item>
+                </Descriptions>
+
+                <div>
+                  <Typography.Title level={5} className="!mb-3">
+                    流程记录
+                  </Typography.Title>
+                  {timelineItems.length ? <Timeline items={timelineItems} /> : <Empty description="暂无操作记录" />}
+                </div>
+              </Space>
+            )}
+          </Card>
+        </div>
       </main>
     </div>
   );

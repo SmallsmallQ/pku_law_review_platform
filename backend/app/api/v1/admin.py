@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import RequireAdmin, get_db
 from app.core.security import hash_password
-from app.models import Manuscript, RevisionTemplate, Section, SystemConfig, User
+from app.models import EditorAction, Manuscript, RevisionTemplate, Section, SystemConfig, User
 
 router = APIRouter()
 
@@ -18,6 +18,12 @@ def _assign_user_id_for_sqlite(db: Session, user: User) -> None:
     """SQLite 下 BIGINT 主键不会自增，这里手动分配。"""
     if db.bind is not None and db.bind.dialect.name == "sqlite":
         user.id = (db.query(func.max(User.id)).scalar() or 0) + 1
+
+
+def _assign_editor_action_id_for_sqlite(db: Session, action: EditorAction) -> None:
+    """SQLite 下 BIGINT 主键不会自增，这里手动分配。"""
+    if db.bind is not None and db.bind.dialect.name == "sqlite":
+        action.id = (db.query(func.max(EditorAction.id)).scalar() or 0) + 1
 
 
 def _validate_password(password: str) -> None:
@@ -53,6 +59,20 @@ class UpdateUserBody(BaseModel):
     role: str | None = None
     is_active: bool | None = None
     password: str | None = None
+
+
+class AdminManuscriptItem(BaseModel):
+    id: int
+    manuscript_no: str
+    title: str
+    status: str
+    submitted_by: int
+    submitted_by_email: str | None
+    section_id: int | None
+    section_name: str | None
+    current_version_id: int | None
+    created_at: str
+    updated_at: str | None
 
 
 @router.get("/users", response_model=dict)
@@ -95,6 +115,108 @@ def list_users(
         ],
         "total": total,
     }
+
+
+@router.get("/manuscripts", response_model=dict)
+def list_manuscripts(
+    _user: User = Depends(RequireAdmin),
+    db: Session = Depends(get_db),
+    status: str | None = Query(None),
+    section_id: int | None = Query(None),
+    keyword: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    q = db.query(Manuscript, User.email, Section.name).outerjoin(User, User.id == Manuscript.submitted_by).outerjoin(
+        Section, Section.id == Manuscript.section_id
+    )
+    if status:
+        q = q.filter(Manuscript.status == status)
+    if section_id is not None:
+        q = q.filter(Manuscript.section_id == section_id)
+    if keyword:
+        k = f"%{keyword.strip().lower()}%"
+        q = q.filter(
+            or_(
+                func.lower(Manuscript.title).like(k),
+                func.lower(Manuscript.manuscript_no).like(k),
+                func.lower(func.coalesce(User.email, "")).like(k),
+            )
+        )
+    total = q.count()
+    rows = q.order_by(Manuscript.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    return {
+        "items": [
+            AdminManuscriptItem(
+                id=m.id,
+                manuscript_no=m.manuscript_no,
+                title=m.title,
+                status=m.status,
+                submitted_by=m.submitted_by,
+                submitted_by_email=email,
+                section_id=m.section_id,
+                section_name=section_name,
+                current_version_id=m.current_version_id,
+                created_at=m.created_at.isoformat() if m.created_at else "",
+                updated_at=m.updated_at.isoformat() if m.updated_at else None,
+            )
+            for m, email, section_name in rows
+        ],
+        "total": total,
+    }
+
+
+class AdminManuscriptActionBody(BaseModel):
+    action_type: str  # status_change | revision_request | reject | accept
+    to_status: str | None = None
+    comment: str | None = None
+
+
+_VALID_ACTION_TYPES = {"revision_request", "reject", "accept", "status_change"}
+
+
+@router.post("/manuscripts/{manuscript_id}/actions", response_model=dict)
+def manuscript_action(
+    manuscript_id: int,
+    body: AdminManuscriptActionBody,
+    current_user: User = Depends(RequireAdmin),
+    db: Session = Depends(get_db),
+):
+    if body.action_type not in _VALID_ACTION_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"action_type 须为 {sorted(_VALID_ACTION_TYPES)} 之一",
+        )
+    m = db.query(Manuscript).filter(Manuscript.id == manuscript_id).first()
+    if not m:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
+
+    from_status = m.status
+    to_status = body.to_status
+    if body.action_type == "revision_request":
+        to_status = "revision_requested"
+    elif body.action_type == "reject":
+        to_status = "rejected"
+    elif body.action_type == "accept":
+        to_status = "accepted"
+    elif body.action_type == "status_change" and body.to_status:
+        to_status = body.to_status
+    else:
+        to_status = to_status or from_status
+
+    action = EditorAction(
+        manuscript_id=manuscript_id,
+        editor_id=current_user.id,
+        action_type=body.action_type,
+        from_status=from_status,
+        to_status=to_status,
+        comment=body.comment,
+    )
+    _assign_editor_action_id_for_sqlite(db, action)
+    db.add(action)
+    m.status = to_status
+    db.commit()
+    return {"message": "ok", "new_status": to_status}
 
 
 @router.post("/users", response_model=AdminUserItem)

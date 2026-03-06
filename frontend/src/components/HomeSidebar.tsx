@@ -20,14 +20,15 @@ export default function HomeSidebar() {
   if (user?.role === "admin") {
     actions = [...actions, { label: "管理后台", href: "/admin", desc: "系统配置" }];
   }
+
   return (
     <Card
-      title="系统入口"
-      size="small"
-      className="!border-[#e0ddd8]"
-      extra={user && <Typography.Text type="secondary" className="text-xs">已登录</Typography.Text>}
+      title={<span className="text-[20px] font-semibold text-[#2e3340]">系统入口</span>}
+      extra={user && <Typography.Text className="text-sm text-[#7a7f8a]">已登录</Typography.Text>}
+      className="!rounded-none !border-[#d9dde4] !shadow-none"
+      styles={{ body: { padding: 16 } }}
     >
-      <Typography.Paragraph type="secondary" className="!mb-3 !mt-0 text-xs">
+      <Typography.Paragraph className="!mb-3 !mt-0 text-sm text-[#626978]">
         投稿、审稿、查看进度
       </Typography.Paragraph>
       <Space direction="vertical" className="w-full" size="middle">
@@ -36,8 +37,8 @@ export default function HomeSidebar() {
             <Button
               block
               type="primary"
-              size="middle"
-              className="!bg-[#8B1538] hover:!bg-[#70122e] !border-0"
+              size="large"
+              className="!h-11 !rounded-md !border-0 !bg-[#8B1538] text-base hover:!bg-[#70122e]"
             >
               {item.label}
             </Button>

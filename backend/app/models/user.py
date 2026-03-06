@@ -1,13 +1,14 @@
-from sqlalchemy import Boolean, Column, DateTime, BigInteger, String
+from sqlalchemy import Boolean, Column, DateTime, String
 from sqlalchemy.sql import func
 
 from app.db.base import Base
+from app.db.types import IDType
 
 
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(IDType, primary_key=True, autoincrement=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     real_name = Column(String(100))

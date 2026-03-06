@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, status, UploadFile, BackgroundTasks
 from fastapi.responses import FileResponse
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user, get_current_user_for_download
@@ -21,6 +22,12 @@ from app.schemas.manuscript import (
 )
 
 router = APIRouter()
+
+
+def _assign_id_for_sqlite(db: Session, model, obj) -> None:
+    """SQLite 下 BIGINT 主键不会自增，手动分配主键。"""
+    if db.bind is not None and db.bind.dialect.name == "sqlite":
+        obj.id = (db.query(func.max(model.id)).scalar() or 0) + 1
 
 
 def _version_brief(v: ManuscriptVersion) -> ManuscriptVersionBrief:
@@ -88,6 +95,7 @@ def create_manuscript(
         status=status_val,
         manuscript_no="",  # 下面用 id 生成
     )
+    _assign_id_for_sqlite(db, Manuscript, manuscript)
     db.add(manuscript)
     db.flush()
 
@@ -111,6 +119,7 @@ def create_manuscript(
         file_name_original=file.filename,
         supplement_path=supplement_path,
     )
+    _assign_id_for_sqlite(db, ManuscriptVersion, version)
     db.add(version)
     db.flush()
     manuscript.current_version_id = version.id
@@ -136,11 +145,20 @@ def my_manuscripts(
     page: int = 1,
     page_size: int = 20,
     status: str | None = None,
+    keyword: str | None = None,
 ):
     """我的稿件列表，分页；可选按 status 筛选。"""
     q = db.query(Manuscript).filter(Manuscript.submitted_by == user.id)
     if status:
         q = q.filter(Manuscript.status == status)
+    if keyword and keyword.strip():
+        k = f"%{keyword.strip().lower()}%"
+        q = q.filter(
+            or_(
+                func.lower(func.coalesce(Manuscript.title, "")).like(k),
+                func.lower(func.coalesce(Manuscript.manuscript_no, "")).like(k),
+            )
+        )
     total = q.count()
     items = q.order_by(Manuscript.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
     return {
@@ -229,6 +247,7 @@ def upload_revision(
         file_path=file_path,
         file_name_original=file.filename,
     )
+    _assign_id_for_sqlite(db, ManuscriptVersion, version)
     db.add(version)
     db.flush()
     m.current_version_id = version.id

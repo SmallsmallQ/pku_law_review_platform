@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -17,6 +18,12 @@ from app.services.llm import chat_completion, is_llm_configured
 from app.services.review_service import generate_full_ai_report
 
 router = APIRouter()
+
+
+def _assign_editor_action_id_for_sqlite(db: Session, action: EditorAction) -> None:
+    """SQLite 下 BIGINT 主键不会自增，手动分配 editor_actions.id。"""
+    if db.bind is not None and db.bind.dialect.name == "sqlite":
+        action.id = (db.query(func.max(EditorAction.id)).scalar() or 0) + 1
 
 
 class EditorManuscriptListItem(BaseModel):
@@ -46,11 +53,20 @@ def editor_manuscript_list(
     page: int = 1,
     page_size: int = 20,
     status: str | None = None,
+    keyword: str | None = None,
 ):
     """编辑稿件列表，支持按状态筛选。"""
     q = db.query(Manuscript)
     if status:
         q = q.filter(Manuscript.status == status)
+    if keyword and keyword.strip():
+        k = f"%{keyword.strip().lower()}%"
+        q = q.filter(
+            or_(
+                func.lower(func.coalesce(Manuscript.title, "")).like(k),
+                func.lower(func.coalesce(Manuscript.manuscript_no, "")).like(k),
+            )
+        )
     total = q.count()
     items = q.order_by(Manuscript.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
     return {
@@ -191,6 +207,7 @@ def editor_action(
         to_status=to_status,
         comment=body.comment,
     )
+    _assign_editor_action_id_for_sqlite(db, action)
     db.add(action)
     m.status = to_status
     db.commit()

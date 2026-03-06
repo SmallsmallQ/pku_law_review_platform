@@ -78,6 +78,8 @@
 
 | 方法 | 路径 | 说明 | 请求/响应要点 |
 |------|------|------|----------------|
+| GET | /admin/manuscripts | 全站稿件列表 | query: status?, section_id?, keyword?, page, page_size。仅 admin。 |
+| POST | /admin/manuscripts/{id}/actions | 管理员稿件操作 | body: action_type（status_change / revision_request / reject / accept）, to_status?, comment?。 |
 | GET | /admin/users | 用户列表 | query: role?, is_active?, page, page_size。仅 admin。 |
 | POST | /admin/users | 创建用户（如编辑账号） | body: email, password, real_name, role。 |
 | PUT | /admin/users/{id} | 更新用户 | 可改 real_name, role, is_active 等。 |

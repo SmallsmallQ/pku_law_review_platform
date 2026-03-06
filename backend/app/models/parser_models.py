@@ -1,15 +1,16 @@
-from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, Text, JSON, Numeric
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, JSON, Numeric
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db.base import Base
+from app.db.types import IDType
 
 
 class ManuscriptParsed(Base):
     __tablename__ = "manuscript_parsed"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    version_id = Column(BigInteger, ForeignKey("manuscript_versions.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    id = Column(IDType, primary_key=True, autoincrement=True)
+    version_id = Column(IDType, ForeignKey("manuscript_versions.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
     title = Column(String(500))
     abstract = Column(Text)
     keywords = Column(String(500))
@@ -26,9 +27,9 @@ class ManuscriptParsed(Base):
 class ReviewReport(Base):
     __tablename__ = "review_reports"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    manuscript_id = Column(BigInteger, ForeignKey("manuscripts.id", ondelete="CASCADE"), nullable=False, index=True)
-    version_id = Column(BigInteger, ForeignKey("manuscript_versions.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = Column(IDType, primary_key=True, autoincrement=True)
+    manuscript_id = Column(IDType, ForeignKey("manuscripts.id", ondelete="CASCADE"), nullable=False, index=True)
+    version_id = Column(IDType, ForeignKey("manuscript_versions.id", ondelete="CASCADE"), nullable=False, index=True)
     report_type = Column(String(20), default="preliminary")
     content = Column(JSON, nullable=False)
     generated_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -43,8 +44,8 @@ class ReviewReport(Base):
 class CitationIssue(Base):
     __tablename__ = "citation_issues"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    report_id = Column(BigInteger, ForeignKey("review_reports.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = Column(IDType, primary_key=True, autoincrement=True)
+    report_id = Column(IDType, ForeignKey("review_reports.id", ondelete="CASCADE"), nullable=False, index=True)
     location = Column(String(200))
     issue_type = Column(String(50))
     description = Column(Text)
@@ -58,9 +59,9 @@ class CitationIssue(Base):
 class SimilarityResult(Base):
     __tablename__ = "similarity_results"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    report_id = Column(BigInteger, ForeignKey("review_reports.id", ondelete="CASCADE"), nullable=False, index=True)
-    source_version_id = Column(BigInteger, ForeignKey("manuscript_versions.id"), nullable=False)
+    id = Column(IDType, primary_key=True, autoincrement=True)
+    report_id = Column(IDType, ForeignKey("review_reports.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_version_id = Column(IDType, ForeignKey("manuscript_versions.id"), nullable=False)
     target_type = Column(String(30))
     target_id = Column(String(100))
     source_excerpt = Column(Text)
@@ -74,11 +75,11 @@ class SimilarityResult(Base):
 class KnowledgeChunk(Base):
     __tablename__ = "knowledge_chunks"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(IDType, primary_key=True, autoincrement=True)
     source_type = Column(String(30), nullable=False)
     source_id = Column(String(100), nullable=False)
-    manuscript_id = Column(BigInteger, ForeignKey("manuscripts.id"), index=True)
-    version_id = Column(BigInteger, ForeignKey("manuscript_versions.id"), index=True)
+    manuscript_id = Column(IDType, ForeignKey("manuscripts.id"), index=True)
+    version_id = Column(IDType, ForeignKey("manuscript_versions.id"), index=True)
     chunk_index = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
     meta = Column(JSON)

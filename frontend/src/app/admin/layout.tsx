@@ -11,6 +11,7 @@ const { Content } = Layout;
 
 const adminNavItems = [
   { key: "/admin", label: "仪表盘" },
+  { key: "/admin/manuscripts", label: "稿件总览" },
   { key: "/admin/users", label: "用户管理" },
   { key: "/admin/sections", label: "栏目管理" },
   { key: "/admin/templates", label: "退修模板" },

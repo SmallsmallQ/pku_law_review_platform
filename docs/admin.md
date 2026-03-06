@@ -9,6 +9,7 @@
 ## 功能范围
 
 - **仪表盘** `/admin`：稿件总数、待处理数、栏目数、退修模板数、用户角色分布、稿件状态分布。
+- **稿件总览** `/admin/manuscripts`：按状态/栏目/关键词筛选全站稿件，支持查看详情、退修、录用、退稿。
 - **用户管理** `/admin/users`：列表（按角色/启用状态筛选、分页）、新建用户（邮箱、密码、姓名、角色）、编辑（姓名、角色、启用状态）。
 - **栏目管理** `/admin/sections`：列表、新增/编辑/删除栏目（名称、编码、排序）。
 - **退修模板** `/admin/templates`：列表、新增/编辑模板（名称、内容、是否启用）。
@@ -22,7 +23,7 @@
 ## 后端接口
 
 - 见 `docs/api-spec.md` 第七章「管理员端」。
-- 路由：`/api/v1/admin/users`、`/admin/sections`、`/admin/templates/revision`、`/admin/config`、`/admin/stats`。
+- 路由：`/api/v1/admin/manuscripts`、`/admin/users`、`/admin/sections`、`/admin/templates/revision`、`/admin/config`、`/admin/stats`。
 - 新建表：`revision_templates`、`system_config`。部署后需执行 `python -m scripts.init_db`（或对应迁移）以创建新表。
 
 ## 首次使用

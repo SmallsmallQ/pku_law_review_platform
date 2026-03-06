@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Button, Input, Layout, Menu, Space } from "antd";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -30,8 +31,35 @@ function getSelectedKey(pathname: string) {
 export default function HeaderBar() {
   const { user, loading, logout } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [searchKeyword, setSearchKeyword] = useState("");
   const selectedKey = getSelectedKey(pathname);
   const navItems = getNavItems(user?.role === "admin");
+  const q = searchParams.get("q") ?? "";
+
+  useEffect(() => {
+    setSearchKeyword(q);
+  }, [q, pathname]);
+
+  const handleSearch = (raw: string) => {
+    const keyword = raw.trim();
+    let target = "/";
+    if (pathname.startsWith("/editor")) target = "/editor";
+    else if (pathname.startsWith("/author")) target = "/author";
+    else if (user?.role === "editor" || user?.role === "admin") target = "/editor";
+    else if (user?.role === "author") target = "/author";
+    else {
+      const returnUrl = keyword ? `/author?q=${encodeURIComponent(keyword)}` : "/author";
+      router.push(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
+      return;
+    }
+    if (!keyword) {
+      router.push(target);
+      return;
+    }
+    router.push(`${target}?q=${encodeURIComponent(keyword)}`);
+  };
 
   return (
     <Header className="!bg-white !px-0 !py-0 h-auto">
@@ -47,7 +75,15 @@ export default function HeaderBar() {
             className="order-3 w-full !border-0 !min-w-0 sm:order-none sm:flex-1 sm:justify-end [&_.ant-menu-item]:!text-[#333]"
             style={{ lineHeight: "48px" }}
           />
-          <Input placeholder="站内搜索" allowClear className="w-40 max-w-full sm:w-48" aria-label="站内搜索" />
+          <Input.Search
+            placeholder="站内搜索"
+            allowClear
+            className="w-52 max-w-full sm:w-64"
+            aria-label="站内搜索"
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            onSearch={handleSearch}
+          />
           <a
             href="https://www.law.pku.edu.cn/"
             target="_blank"

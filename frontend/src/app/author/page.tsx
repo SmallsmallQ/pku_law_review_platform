@@ -16,6 +16,7 @@ export default function AuthorCenterPage() {
   const { user, loading: authLoading, setUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const keywordFilter = (searchParams.get("q") ?? "").trim();
   const [profileForm] = Form.useForm<{ real_name?: string; institution?: string }>();
   const [list, setList] = useState<ManuscriptListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -47,6 +48,7 @@ export default function AuthorCenterPage() {
           page,
           page_size: pageSize,
           ...(statusFilter ? { status: statusFilter } : {}),
+          ...(keywordFilter ? { keyword: keywordFilter } : {}),
         });
         setList(res.items);
         setTotal(res.total);
@@ -57,7 +59,7 @@ export default function AuthorCenterPage() {
         setLoading(false);
       }
     })();
-  }, [user, page, statusFilter, router]);
+  }, [user, page, statusFilter, keywordFilter, router]);
 
   useEffect(() => {
     if (!user) return;
@@ -184,6 +186,14 @@ export default function AuthorCenterPage() {
             </Space>
           }
         >
+          {keywordFilter && (
+            <Alert
+              className="mb-4"
+              type="info"
+              showIcon
+              message={`当前搜索：${keywordFilter}`}
+            />
+          )}
           {successMessage && (
             <Alert message={successMessage} type="success" showIcon className="mb-4" />
           )}

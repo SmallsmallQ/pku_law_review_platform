@@ -22,7 +22,6 @@ if __name__ == "__main__":
         from app.core.security import hash_password
         from app.models import User
         from app.db.base import SessionLocal
-        from sqlalchemy import func
 
         db = SessionLocal()
         try:
@@ -35,8 +34,6 @@ if __name__ == "__main__":
                     real_name="测试编辑",
                     role="editor",
                 )
-                if db.bind is not None and db.bind.dialect.name == "sqlite":
-                    u.id = (db.query(func.max(User.id)).scalar() or 0) + 1
                 db.add(u)
                 db.commit()
                 print(f"Created editor: {email}")

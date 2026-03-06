@@ -1,17 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { Button, Card, Col, List, Row, Space, Typography } from "antd";
+import { Button, Typography } from "antd";
+import { ArrowRightOutlined } from "@ant-design/icons";
 import HeaderBar from "@/components/HeaderBar";
-import HomeSidebar from "@/components/HomeSidebar";
-import JournalCoverCard from "@/components/JournalCoverCard";
+import { useAuth } from "@/contexts/AuthContext";
 
 const { Title, Text, Paragraph } = Typography;
 
 const noticeItems = [
-  { href: "/submit", text: "本刊实行在线投稿，请通过「投稿入口」提交" },
-  { href: "/author", text: "作者可登录作者中心查看审稿状态与退修意见" },
-  { text: "审稿周期约 2–3 个月" },
+  { type: "投稿", href: "/submit", text: "本刊实行在线投稿，请通过「投稿入口」提交" },
+  { type: "跟踪", href: "/author", text: "作者可登录作者中心查看审稿状态与退修意见" },
+  { type: "周期", text: "审稿周期约 2-3 个月，退修后优先复审" },
 ];
 
 const serviceLinks = [
@@ -20,16 +20,23 @@ const serviceLinks = [
   { label: "作者中心", href: "/author" },
   { label: "投稿入口", href: "/submit" },
   { label: "编辑工作台", href: "/editor" },
-  { label: "联系我们", href: "/" },
+  { label: "版权转让协议", href: "/copyright" },
+];
+
+const actionLinks = [
+  { label: "作者投稿", desc: "提交新稿并上传附件", href: "/submit" },
+  { label: "编辑审稿", desc: "处理初审与编务流转", href: "/editor" },
+  { label: "作者中心", desc: "查看状态与退修意见", href: "/author" },
 ];
 
 export default function HomePage() {
+  const { user } = useAuth();
+
   return (
-    <div className="min-h-screen bg-[#f9f8f5]">
+    <div className="min-h-screen bg-white">
       <HeaderBar />
 
-      {/* 主视觉区 */}
-      <section className="relative min-h-[320px] w-full overflow-hidden bg-[#8B1538] md:min-h-[380px]" aria-label="期刊标题与简介">
+      <section className="relative min-h-[320px] w-full overflow-hidden bg-[#8B1538] md:min-h-[360px]" aria-label="期刊标题与简介">
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
@@ -38,108 +45,118 @@ export default function HomePage() {
           }}
           aria-hidden
         />
-        <div className="absolute inset-0 bg-[#8B1538]/75" aria-hidden />
-        <div className="relative mx-auto flex min-h-[320px] max-w-6xl flex-col items-center justify-center px-6 py-16 text-center text-white md:min-h-[380px]">
+        <div className="absolute inset-0 bg-gradient-to-r from-[#8B1538]/72 via-[#8B1538]/58 to-[#5f1029]/74" aria-hidden />
+        <div className="absolute inset-0 bg-[#65122c]/18" aria-hidden />
+        <div className="relative mx-auto flex min-h-[320px] max-w-6xl flex-col items-center justify-center px-6 py-16 text-center text-white md:min-h-[360px]">
           <Title level={1} className="!mb-3 !text-white !tracking-tight drop-shadow md:!text-4xl lg:!text-5xl">
             《中外法学》
           </Title>
-          <Text className="text-lg text-white/95 md:text-xl">
-            北京大学法学院主办 · 法学类核心期刊
-          </Text>
-          <Text className="mt-2 block text-sm text-white/80">
-            智能编审系统 — 投稿管理 · AI 辅助初审
-          </Text>
+          <Text className="text-lg text-white/95 md:text-xl">北京大学法学院主办 · 法学类核心期刊</Text>
+          <Text className="mt-2 block text-sm text-white/80">智能编审系统 — 投稿管理 · AI 辅助初审</Text>
         </div>
       </section>
 
-      <main id="main-content" className="relative z-10 mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8" aria-label="主内容">
-        <Row gutter={[32, 24]}>
-          {/* 左栏：期刊封面 + 投稿与简介 */}
-          <Col xs={24} lg={8}>
-            <Space direction="vertical" size="middle" className="w-full">
-              <JournalCoverCard />
-              <Card size="small" className="!border-[#e0ddd8]">
-                <div className="space-y-2">
-                  <Link href="/guide" className="block text-[#333] hover:text-[#8B1538] text-sm font-medium">
-                    投稿须知
-                  </Link>
-                  <Link href="/submit" className="block text-[#333] hover:text-[#8B1538] text-sm font-medium">
-                    投稿入口
-                  </Link>
-                </div>
-                <Paragraph className="!mb-0 !mt-3 text-[#666] text-xs border-t border-[#eee] pt-3">
-                  《中外法学》由北京大学法学院主办，CSSCI 来源期刊。本系统提供在线投稿与 AI 辅助初审。
-                </Paragraph>
-              </Card>
-            </Space>
-          </Col>
+      <main id="main-content" className="pb-14" aria-label="主内容">
+        <section className="relative overflow-hidden">
+          <div
+            className="pointer-events-none absolute left-1/2 top-0 h-full w-screen -translate-x-1/2 opacity-[0.06]"
+            style={{ backgroundImage: "url(/banner.jpg)", backgroundPosition: "center", backgroundSize: "cover" }}
+            aria-hidden
+          />
+          <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+            <div className="border-b border-[#d7dce5] py-4 text-sm text-[#4f5563]">
+              目录与全文以官网为准，本系统用于投稿、审稿流转与作者回传。
+            </div>
 
-          {/* 中栏：目录 + 服务链接 + 通知与投稿（合并为三块） */}
-          <Col xs={24} lg={10}>
-            <Card size="small" className="mb-4 !border-[#e0ddd8]">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[#333] font-medium text-sm">目录第 38 卷（2026）第 1 期</span>
-                <a href="https://www.law.pku.edu.cn/" target="_blank" rel="noopener noreferrer" className="text-[#8B1538] text-sm hover:underline">
+            <div className="relative grid lg:grid-cols-[280px_minmax(0,1fr)_320px]">
+              <aside className="border-b border-[#dfe4ec] py-6 lg:border-b-0 lg:border-r lg:pr-6">
+              <Text className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#8B1538]">Peking University Law Journal</Text>
+              <Title level={2} className="!mb-0 !mt-3 !text-[34px] !font-semibold !tracking-tight !text-[#2d313d] whitespace-nowrap">
+                《中外法学》
+              </Title>
+              <div className="mt-4 space-y-1 text-[14px] text-[#5f6573]">
+                <p className="m-0">创刊时间：1984 年</p>
+                <p className="m-0">2026 年刊期：第 38 卷</p>
+              </div>
+              <Link href="/submit" className="mt-5 inline-flex items-center gap-1 text-[16px] font-semibold text-[#8B1538] hover:underline">
+                投稿入口 <ArrowRightOutlined />
+              </Link>
+
+              <Paragraph className="!mb-0 !mt-8 border-t border-[#e6eaf0] pt-4 !text-[14px] !leading-7 !text-[#59606f]">
+                《中外法学》由北京大学法学院主办，CSSCI 来源期刊。系统支持在线投稿、审稿跟踪与退修上传。
+              </Paragraph>
+              </aside>
+
+              <div className="border-b border-[#dfe4ec] py-6 lg:border-b-0 lg:border-r lg:px-6">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#e6eaf0] pb-4">
+                <div>
+                  <Text className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8B1538]">当期目录</Text>
+                  <Title level={3} className="!mb-0 !mt-2 !text-[34px] !font-semibold !text-[#2e3340] whitespace-nowrap">第 38 卷（2026）第 1 期</Title>
+                </div>
+                <a href="https://www.law.pku.edu.cn/" target="_blank" rel="noopener noreferrer" className="text-[16px] font-semibold text-[#8B1538] hover:underline">
                   MORE+
                 </a>
-              </div>
-              <Paragraph className="!mb-0 mt-1 text-[#666] text-xs">
-                目录与全文见本刊官网；本系统负责投稿与审稿。
-              </Paragraph>
-            </Card>
+                </div>
 
-            <Card title="服务与指南" size="small" className="mb-4 !border-[#e0ddd8]">
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                {serviceLinks.map((item) => (
-                  <Link key={item.label} href={item.href} className="text-[#8B1538] hover:underline">
-                    {item.label}
-                  </Link>
-                ))}
-              </div>
-            </Card>
+                <Paragraph className="!mb-0 !mt-4 !text-[15px] !leading-8 !text-[#5a6170]">
+                  目录与全文见本刊官网；本系统负责投稿、审稿流转与作者回传。
+                </Paragraph>
 
-            <Card size="small" className="!border-[#e0ddd8]">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <div className="text-[#333] font-medium text-sm mb-2">通知</div>
-                  <List
-                    size="small"
-                    dataSource={noticeItems}
-                    renderItem={(item) => (
-                      <List.Item className="!border-0 !py-0.5 !px-0">
+                <div className="mt-6 border-t border-[#e6eaf0] pt-5">
+                  <Text className="text-[18px] font-semibold text-[#2e3340]">服务与指南</Text>
+                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[16px]">
+                    {serviceLinks.map((item) => (
+                      <Link key={item.label} href={item.href} className="text-[#8B1538] hover:underline">
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-6 border-t border-[#e6eaf0] pt-5">
+                  <Text className="text-[18px] font-semibold text-[#2e3340]">通知</Text>
+                  <div className="mt-3 space-y-3">
+                    {noticeItems.map((item) => (
+                      <div key={item.text} className="flex items-start gap-3">
+                        <span className="mt-0.5 rounded-sm bg-[#8B1538] px-2 py-0.5 text-xs font-semibold text-white">{item.type}</span>
                         {item.href ? (
-                          <Link href={item.href} className="text-[#555] hover:text-[#8B1538] text-sm">
+                          <Link href={item.href} className="text-[15px] text-[#4f5563] hover:text-[#8B1538]">
                             {item.text}
                           </Link>
                         ) : (
-                          <span className="text-[#555] text-sm">{item.text}</span>
+                          <span className="text-[15px] text-[#4f5563]">{item.text}</span>
                         )}
-                      </List.Item>
-                    )}
-                  />
-                </div>
-                <div className="shrink-0">
-                  <div className="text-[#333] font-medium text-sm mb-2">投稿</div>
-                  <Space direction="vertical" size="small">
-                    <Link href="/submit">
-                      <Button type="primary" size="small" className="!bg-[#8B1538] hover:!bg-[#70122e]">
-                        投稿入口
-                      </Button>
-                    </Link>
-                    <Link href="/author">
-                      <Button size="small">作者中心</Button>
-                    </Link>
-                  </Space>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </Card>
-          </Col>
 
-          {/* 右栏：仅系统入口（三个主操作） */}
-          <Col xs={24} lg={6}>
-            <HomeSidebar />
-          </Col>
-        </Row>
+              <aside className="py-6 lg:pl-6">
+                <Text className="text-[18px] font-semibold text-[#2e3340]">系统入口</Text>
+                <Paragraph className="!mb-0 !mt-2 !text-sm !leading-7 !text-[#626978]">
+                  投稿、审稿、查看进度一站完成。{user ? "当前账号已登录。" : "请先登录后使用完整功能。"}
+                </Paragraph>
+
+                <div className="mt-4 space-y-3">
+                  {actionLinks.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between border-b border-[#eceff4] pb-3">
+                      <div>
+                        <p className="m-0 text-[16px] font-semibold text-[#2d313d]">{item.label}</p>
+                        <p className="m-0 mt-1 text-sm text-[#6a7180]">{item.desc}</p>
+                      </div>
+                      <Link href={item.href}>
+                        <Button type="primary" size="middle" className="!rounded !border-0 !bg-[#8B1538] hover:!bg-[#70122e]">
+                          进入
+                        </Button>
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </aside>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   );
