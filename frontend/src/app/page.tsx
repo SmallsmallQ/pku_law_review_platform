@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Button, Card, Col, Divider, List, Row, Space, Typography } from "antd";
+import { Button, Card, Col, List, Row, Space, Typography } from "antd";
 import HeaderBar from "@/components/HeaderBar";
 import HomeSidebar from "@/components/HomeSidebar";
 import JournalCoverCard from "@/components/JournalCoverCard";
@@ -51,195 +51,115 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className="relative z-10 mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-        <Row gutter={[24, 24]}>
-          {/* 左栏：期刊封面 + 投稿指南 + 期刊介绍（参考官网布局） */}
-          <Col xs={24} md={8} lg={6}>
+      <div className="relative z-10 mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+        <Row gutter={[32, 24]}>
+          {/* 左栏：期刊封面 + 投稿与简介（合并为两小块） */}
+          <Col xs={24} lg={8}>
             <Space direction="vertical" size="middle" className="w-full">
               <JournalCoverCard />
               <Card size="small" className="!border-[#e0ddd8]">
-                <div className="space-y-3">
-                  <Link href="/submit" className="flex items-center gap-2 text-[#333] hover:text-[#8B1538]">
-                    <span className="text-[#8B1538]">✎</span>
-                    <span className="font-medium">投稿指南</span>
+                <div className="space-y-2">
+                  <Link href="/submit" className="block text-[#333] hover:text-[#8B1538] text-sm font-medium">
+                    投稿指南
                   </Link>
-                  <Link href="/submit" className="flex items-center gap-2 text-[#333] hover:text-[#8B1538]">
-                    <span className="text-[#8B1538]">▷</span>
-                    <span className="font-medium">投稿要求</span>
+                  <Link href="/submit" className="block text-[#333] hover:text-[#8B1538] text-sm font-medium">
+                    投稿要求
                   </Link>
                 </div>
-              </Card>
-              <Card title="期刊介绍" size="small" className="!border-[#e0ddd8]">
-                <Paragraph className="!mb-0 text-[#555] text-sm">
-                  《中外法学》由北京大学法学院主办，CSSCI 来源期刊。本系统提供在线投稿、稿件管理与 AI 辅助初审。
+                <Paragraph className="!mb-0 !mt-3 text-[#666] text-xs border-t border-[#eee] pt-3">
+                  《中外法学》由北京大学法学院主办，CSSCI 来源期刊。本系统提供在线投稿与 AI 辅助初审。
                 </Paragraph>
               </Card>
             </Space>
           </Col>
 
-          {/* 中栏：目录 + 服务与指南 + 通知公告 + 新闻等 */}
-          <Col xs={24} md={16} lg={11}>
-            <Card
-              title={
-                <span className="text-base font-semibold text-[#333]">
-                  目录第 38 卷（2026）第 1 期（总第 223 期）
-                </span>
-              }
-              extra={<Link href="https://www.law.pku.edu.cn/" target="_blank" rel="noopener noreferrer" className="text-[#8B1538] hover:underline">MORE+</Link>}
-              className="mb-4 !border-[#e0ddd8]"
-            >
-              <Paragraph className="!mb-0 text-[#555] text-sm">
-                目录与全文请见本刊官网；本系统提供投稿与审稿服务。
+          {/* 中栏：目录 + 服务链接 + 通知与投稿（合并为三块） */}
+          <Col xs={24} lg={10}>
+            <Card size="small" className="mb-4 !border-[#e0ddd8]">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[#333] font-medium text-sm">目录第 38 卷（2026）第 1 期</span>
+                <a href="https://www.law.pku.edu.cn/" target="_blank" rel="noopener noreferrer" className="text-[#8B1538] text-sm hover:underline">
+                  MORE+
+                </a>
+              </div>
+              <Paragraph className="!mb-0 mt-1 text-[#666] text-xs">
+                目录与全文见本刊官网；本系统负责投稿与审稿。
               </Paragraph>
             </Card>
 
-            <Divider orientation="center" className="!text-base font-semibold !text-[#333]">
-              服务与指南
-            </Divider>
-            <Row gutter={[16, 16]}>
-              <Col xs={24} sm={12}>
-                <Card
-                  title="作者服务"
-                  size="small"
-                  className="h-full !border-[#8B1538]"
-                  styles={{ header: { background: "#8B1538", color: "#fff", borderRadius: "6px 6px 0 0" } }}
-                >
-                  <List
-                    size="small"
-                    dataSource={serviceLinks[0]}
-                    renderItem={(item) => (
-                      <List.Item className="!border-0 !py-1">
-                        <Link href={item.href} className="text-[#8B1538] hover:underline">
-                          — {item.label}
-                        </Link>
-                      </List.Item>
-                    )}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12}>
-                <Card
-                  title="编审系统"
-                  size="small"
-                  className="h-full !border-[#8B1538]"
-                  styles={{ header: { background: "#8B1538", color: "#fff", borderRadius: "6px 6px 0 0" } }}
-                >
-                  <List
-                    size="small"
-                    dataSource={serviceLinks[1]}
-                    renderItem={(item) => (
-                      <List.Item className="!border-0 !py-1">
-                        <Link href={item.href} className="text-[#8B1538] hover:underline">
-                          — {item.label}
-                        </Link>
-                      </List.Item>
-                    )}
-                  />
-                </Card>
-              </Col>
-            </Row>
+            <Card title="服务与指南" size="small" className="mb-4 !border-[#e0ddd8]">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                {serviceLinks.map((item) => (
+                  <Link key={item.label} href={item.href} className="text-[#8B1538] hover:underline">
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            </Card>
 
-            <Row gutter={[16, 16]} className="mt-4">
-              <Col xs={24} sm={12}>
-                <Card title="通知公告" size="small" extra={<Link href="/submit">更多</Link>} className="!border-[#e0ddd8]">
+            <Card size="small" className="!border-[#e0ddd8]">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[#333] font-medium text-sm mb-2">通知</div>
                   <List
                     size="small"
-                    dataSource={noticeData}
+                    dataSource={noticeItems}
                     renderItem={(item) => (
-                      <List.Item className="!border-0 !py-1.5">
+                      <List.Item className="!border-0 !py-0.5 !px-0">
                         {item.href ? (
-                          <Link href={item.href} className="text-[#333] hover:text-[#8B1538] text-sm">
+                          <Link href={item.href} className="text-[#555] hover:text-[#8B1538] text-sm">
                             {item.text}
                           </Link>
                         ) : (
-                          <Text className="text-[#333] text-sm">{item.text}</Text>
+                          <span className="text-[#555] text-sm">{item.text}</span>
                         )}
                       </List.Item>
                     )}
                   />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12}>
-                <Card title="在线投稿" size="small" className="!border-2 !border-[#8B1538]">
-                  <Paragraph className="!mb-3 text-[#555] text-sm">
-                    请先注册/登录后提交稿件
-                  </Paragraph>
-                  <div className="flex flex-wrap gap-2">
+                </div>
+                <div className="shrink-0">
+                  <div className="text-[#333] font-medium text-sm mb-2">投稿</div>
+                  <Space direction="vertical" size="small">
                     <Link href="/submit">
-                      <Button type="primary" size="small">
+                      <Button type="primary" size="small" className="!bg-[#8B1538] hover:!bg-[#70122e]">
                         投稿入口
                       </Button>
                     </Link>
                     <Link href="/author">
                       <Button size="small">作者中心</Button>
                     </Link>
-                  </div>
-                </Card>
-              </Col>
-            </Row>
-
-            <Card
-              title="新闻动态"
-              size="small"
-              extra={<Link href="/submit" className="text-[#8B1538]">MORE+</Link>}
-              className="mt-4 !border-[#e0ddd8]"
-            >
-              <List
-                size="small"
-                dataSource={newsData}
-                renderItem={(item) => (
-                  <List.Item className="!border-0 !py-1.5 !pl-0">
-                    <span className="mr-2 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[#8B1538] align-middle" />
-                    {item.href ? (
-                      <Link href={item.href} className="text-[#333] hover:text-[#8B1538] text-sm">
-                        {item.text}
-                      </Link>
-                    ) : (
-                      <Text className="text-sm">{item.text}</Text>
-                    )}
-                  </List.Item>
-                )}
-              />
-            </Card>
-
-            <Card title="联系我们" size="small" className="mt-4 !border-[#e0ddd8]">
-              <Paragraph className="!mb-0 text-[#555] text-sm">
-                编辑部地址：北京市海淀区颐和园路 5 号北京大学法学院
-                <br />
-                投稿与咨询请通过本系统「作者中心」或「投稿入口」操作。
-              </Paragraph>
+                  </Space>
+                </div>
+              </div>
             </Card>
           </Col>
 
-          {/* 右栏：搜索 + 系统入口 + 新闻动态 */}
-          <Col xs={24} md={24} lg={7}>
+          {/* 右栏：仅系统入口（三个主操作） */}
+          <Col xs={24} lg={6}>
             <HomeSidebar />
           </Col>
         </Row>
       </div>
 
-      <footer className="mt-16 border-t border-[#ebeae6] bg-white py-10">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <Row gutter={24} justify="space-between">
-            <Col>
-              <Text type="secondary">电话：(8610) 62751691</Text>
-              <br />
-              <Text type="secondary">邮箱：journal@law.pku.edu.cn</Text>
-            </Col>
-            <Col>
-              <Space size="middle">
-                <Link href="/" className="text-[#8B1538] hover:underline">首页</Link>
-                <Link href="/submit" className="text-[#8B1538] hover:underline">投稿入口</Link>
-                <Link href="/author" className="text-[#8B1538] hover:underline">作者中心</Link>
-                <Link href="/login" className="text-[#8B1538] hover:underline">登录</Link>
-              </Space>
-            </Col>
-          </Row>
-          <Divider className="!my-4" />
-          <div className="text-center">
-            <Text type="secondary" className="text-sm">
-              版权所有 © 中外法学 · 智能编审系统
-            </Text>
+      <footer className="relative z-10 mt-16 border-t border-[#ebeae6] bg-white py-8">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="text-[#666] text-sm">
+              <span>编辑部：北京市海淀区颐和园路 5 号北京大学法学院</span>
+              <span className="mx-2">·</span>
+              <span>电话 (8610) 62751691</span>
+              <span className="mx-2">·</span>
+              <span>邮箱 journal@law.pku.edu.cn</span>
+            </div>
+            <Space size="middle">
+              <Link href="/" className="text-[#8B1538] hover:underline text-sm">首页</Link>
+              <Link href="/submit" className="text-[#8B1538] hover:underline text-sm">投稿入口</Link>
+              <Link href="/author" className="text-[#8B1538] hover:underline text-sm">作者中心</Link>
+              <Link href="/login" className="text-[#8B1538] hover:underline text-sm">登录</Link>
+            </Space>
+          </div>
+          <div className="mt-4 text-center text-[#999] text-xs">
+            版权所有 © 中外法学 · 智能编审系统
           </div>
         </div>
       </footer>
