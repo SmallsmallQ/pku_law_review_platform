@@ -49,7 +49,7 @@ export default function HeaderBar() {
 
   return (
     <Header className="!bg-white !px-0 !py-0 h-auto">
-      <div className="mx-auto max-w-6xl px-4">
+      <div className="w-full px-4 sm:px-6 lg:px-8 2xl:px-10">
         <div className={`flex items-center gap-3 py-3 ${isDesktop ? "flex-nowrap" : "flex-wrap"}`}>
           <Link href="/" className="mr-2 block shrink-0 py-2 text-xl font-bold text-[#8B1538] hover:text-[#70122e]">
             《中外法学》智能编审系统

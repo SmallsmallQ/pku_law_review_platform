@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Breadcrumb,
   Button,
   Card,
   Descriptions,
+  Drawer,
+  Input,
   List,
   Modal,
   Space,
@@ -39,6 +41,21 @@ export default function EditorManuscriptDetailPage() {
   const [aiReviewLoading, setAiReviewLoading] = useState(false);
   const [aiReport, setAiReport] = useState<{ content: string; model: string } | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [previewType, setPreviewType] = useState<"pdf" | "docx" | "doc" | null>(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [docxPreviewText, setDocxPreviewText] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const previewObjectUrlRef = useRef<string | null>(null);
+  // AI 助手
+  const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
+  const [aiChatMessages, setAiChatMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [aiChatInput, setAiChatInput] = useState("");
+  const [aiChatLoading, setAiChatLoading] = useState(false);
+  const [aiChatError, setAiChatError] = useState<string | null>(null);
+  // 退修意见草稿
+  const [revisionDraftLoading, setRevisionDraftLoading] = useState(false);
+  const [revisionDraftError, setRevisionDraftError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -89,6 +106,41 @@ export default function EditorManuscriptDetailPage() {
     );
   }, [aiReport?.content]);
 
+  const sendAiChat = useCallback(
+    async (message: string) => {
+      if (!id || !message.trim()) return;
+      setAiChatError(null);
+      const userMsg = message.trim();
+      setAiChatMessages((prev) => [...prev, { role: "user", content: userMsg }]);
+      setAiChatInput("");
+      setAiChatLoading(true);
+      try {
+        const res = await editorApi.aiChat(Number(id), userMsg);
+        setAiChatMessages((prev) => [...prev, { role: "assistant", content: res.content }]);
+      } catch (e) {
+        setAiChatError(e instanceof Error ? e.message : "请求失败");
+        setAiChatMessages((prev) => prev.slice(0, -1));
+      } finally {
+        setAiChatLoading(false);
+      }
+    },
+    [id],
+  );
+
+  const runRevisionDraft = useCallback(async () => {
+    if (!id) return;
+    setRevisionDraftError(null);
+    setRevisionDraftLoading(true);
+    try {
+      const res = await editorApi.revisionDraft(Number(id));
+      setRevisionComment(res.draft);
+    } catch (e) {
+      setRevisionDraftError(e instanceof Error ? e.message : "生成失败");
+    } finally {
+      setRevisionDraftLoading(false);
+    }
+  }, [id]);
+
   const runAction = async (actionType: string, comment?: string) => {
     if (!id) return;
     setActionLoading(true);
@@ -109,6 +161,15 @@ export default function EditorManuscriptDetailPage() {
     return () => clearTimeout(t);
   }, [successMessage]);
 
+  useEffect(() => {
+    return () => {
+      if (previewObjectUrlRef.current) {
+        URL.revokeObjectURL(previewObjectUrlRef.current);
+        previewObjectUrlRef.current = null;
+      }
+    };
+  }, []);
+
   const manuscript = detail?.manuscript as Record<string, unknown> | undefined;
   const currentVersion = detail?.current_version as Record<string, unknown> | undefined;
   const parsed = detail?.parsed as Record<string, unknown> | undefined;
@@ -117,6 +178,82 @@ export default function EditorManuscriptDetailPage() {
   const manuscriptNo = manuscript?.manuscript_no as string | undefined;
   const title = manuscript?.title as string | undefined;
   const breadcrumbTitle = manuscriptNo || (title ? `${String(title).slice(0, 20)}${String(title).length > 20 ? "…" : ""}` : "稿件详情");
+
+  useEffect(() => {
+    const versionId = Number(currentVersion?.id);
+    const fileName = String(currentVersion?.file_name_original ?? "");
+
+    if (!id || !currentVersion || !versionId || !fileName) {
+      setPreviewType(null);
+      setDocxPreviewText("");
+      setPreviewError(null);
+      setPreviewLoading(false);
+      if (previewObjectUrlRef.current) {
+        URL.revokeObjectURL(previewObjectUrlRef.current);
+        previewObjectUrlRef.current = null;
+        setPreviewUrl("");
+      }
+      return;
+    }
+
+    const lowerName = fileName.toLowerCase();
+    const nextType = lowerName.endsWith(".pdf")
+      ? "pdf"
+      : lowerName.endsWith(".docx")
+        ? "docx"
+        : lowerName.endsWith(".doc")
+          ? "doc"
+          : null;
+
+    setPreviewType(nextType);
+    setDocxPreviewText("");
+    setPreviewError(null);
+
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+      previewObjectUrlRef.current = null;
+      setPreviewUrl("");
+    }
+
+    if (!nextType || nextType === "doc") {
+      setPreviewLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setPreviewLoading(true);
+
+    fetch(editorApi.downloadUrl(Number(id), versionId))
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error("读取原始稿件失败");
+        }
+        if (nextType === "pdf") {
+          const blob = await res.blob();
+          if (cancelled) return;
+          const objectUrl = URL.createObjectURL(blob);
+          previewObjectUrlRef.current = objectUrl;
+          setPreviewUrl(objectUrl);
+          return;
+        }
+        const arrayBuffer = await res.arrayBuffer();
+        const mammoth = await import("mammoth");
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        if (cancelled) return;
+        setDocxPreviewText((result.value || "").trim().slice(0, 20000));
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setPreviewError(e instanceof Error ? e.message : "原始稿件预览失败");
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentVersion, id]);
 
   if (!user || user.role === "author") return null;
 
@@ -129,7 +266,7 @@ export default function EditorManuscriptDetailPage() {
   return (
     <div className="bg-[#f5f6f8]">
       <HeaderBar />
-      <main className="mx-auto max-w-3xl px-4 py-8">
+      <main className="w-full px-5 py-8 sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
         <Card>
           <Breadcrumb items={breadcrumbItems} className="mb-4" />
           <Typography.Title level={5} className="!mb-4">
@@ -178,6 +315,62 @@ export default function EditorManuscriptDetailPage() {
                   </Descriptions>
                 </Card>
               )}
+              <Card
+                size="small"
+                title="原始稿件"
+                className="mb-4"
+                extra={
+                  currentVersion ? (
+                    <a
+                      href={editorApi.downloadUrl(Number(id), Number(currentVersion.id))}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      下载原稿
+                    </a>
+                  ) : null
+                }
+              >
+                {!currentVersion ? (
+                  <Typography.Text type="secondary">当前稿件暂无可阅读版本。</Typography.Text>
+                ) : (
+                  <div className="space-y-3">
+                    <Typography.Text type="secondary" className="block text-xs">
+                      文件：{String(currentVersion.file_name_original || "未命名文件")}
+                    </Typography.Text>
+                    {previewLoading ? (
+                      <div className="flex items-center gap-3 py-6">
+                        <Spin />
+                        <Typography.Text type="secondary">正在加载原始稿件…</Typography.Text>
+                      </div>
+                    ) : null}
+                    {previewError ? <Alert message={previewError} type="warning" showIcon /> : null}
+                    {!previewLoading && previewType === "pdf" && previewUrl ? (
+                      <iframe
+                        src={previewUrl}
+                        title="原始稿件 PDF 预览"
+                        className="h-[70vh] min-h-[520px] w-full border border-[#dedee3] bg-white"
+                      />
+                    ) : null}
+                    {!previewLoading && previewType === "docx" ? (
+                      <div className="max-h-[70vh] min-h-[520px] overflow-y-auto border border-[#dedee3] bg-white p-5 text-sm leading-8 text-[#2c2c2e]">
+                        {docxPreviewText ? (
+                          <pre className="whitespace-pre-wrap font-sans">{docxPreviewText}</pre>
+                        ) : (
+                          <Typography.Text type="secondary">DOCX 暂无可显示文本，建议下载原稿查看版式。</Typography.Text>
+                        )}
+                      </div>
+                    ) : null}
+                    {!previewLoading && previewType === "doc" ? (
+                      <Alert
+                        message="当前为 .doc 文件。浏览器端暂不支持稳定在线预览，建议直接下载原稿查看。"
+                        type="info"
+                        showIcon
+                      />
+                    ) : null}
+                  </div>
+                )}
+              </Card>
               <Card size="small" title="操作" className="mb-4">
                 {aiReviewLoading && (
                   <Alert message="正在生成 AI 初审报告，预计需要 10–30 秒，请稍候。" type="info" showIcon className="mb-3" />
@@ -191,8 +384,11 @@ export default function EditorManuscriptDetailPage() {
                   >
                     {aiReviewLoading ? "生成中…" : "生成 AI 初审报告"}
                   </Button>
+                  <Button type="default" onClick={() => setAiAssistantOpen(true)}>
+                    AI 助手
+                  </Button>
                   {status !== "revision_requested" && status !== "rejected" && status !== "accepted" && (
-                    <Button onClick={() => setRevisionModalOpen(true)}>退修</Button>
+                    <Button onClick={() => { setRevisionModalOpen(true); setRevisionDraftError(null); }}>退修</Button>
                   )}
                   {status !== "rejected" && (
                     <Button danger onClick={() => setRejectConfirmOpen(true)} disabled={actionLoading}>
@@ -260,22 +456,89 @@ export default function EditorManuscriptDetailPage() {
       <Modal
         title="退修意见"
         open={revisionModalOpen}
-        onCancel={() => { setRevisionModalOpen(false); setRevisionComment(""); }}
+        onCancel={() => { setRevisionModalOpen(false); setRevisionComment(""); setRevisionDraftError(null); }}
         onOk={() => runAction("revision_request", revisionComment)}
         okText="提交退修"
         cancelText="取消"
         confirmLoading={actionLoading}
         destroyOnClose
       >
-        <Typography.Paragraph type="secondary" className="mb-2">请输入退修意见，将发送给作者。</Typography.Paragraph>
+        <Typography.Paragraph type="secondary" className="mb-2">请输入退修意见，将发送给作者。可先使用「AI 生成退修意见草稿」再修改。</Typography.Paragraph>
+        <div className="mb-2">
+          <Button
+            type="dashed"
+            size="small"
+            onClick={runRevisionDraft}
+            loading={revisionDraftLoading}
+          >
+            {revisionDraftLoading ? "生成中…" : "AI 生成退修意见草稿"}
+          </Button>
+          {revisionDraftError && (
+            <Typography.Text type="danger" className="ml-2 text-sm">{revisionDraftError}</Typography.Text>
+          )}
+        </div>
         <textarea
           placeholder="请输入退修意见"
           value={revisionComment}
           onChange={(e) => setRevisionComment(e.target.value)}
-          rows={5}
+          rows={6}
           className="w-full rounded border border-[#d9d9d9] px-4 py-2 text-[#333] focus:border-[#8B1538] focus:outline-none focus:ring-1 focus:ring-[#8B1538]"
         />
       </Modal>
+
+      <Drawer
+        title="AI 助手（基于当前稿件）"
+        placement="right"
+        width={420}
+        open={aiAssistantOpen}
+        onClose={() => setAiAssistantOpen(false)}
+        destroyOnClose={false}
+      >
+        <Typography.Paragraph type="secondary" className="mb-3 text-sm">
+          可基于本稿标题、摘要、关键词与初审报告回答问题。试试：
+        </Typography.Paragraph>
+        <Space direction="vertical" className="mb-4 w-full">
+          {["适合哪个栏目？", "根据报告给一段退修意见", "概括主要问题"].map((q) => (
+            <Button key={q} type="link" className="!p-0 !h-auto text-left" onClick={() => sendAiChat(q)} disabled={aiChatLoading}>
+              {q}
+            </Button>
+          ))}
+        </Space>
+        {aiChatError && <Alert message={aiChatError} type="error" showIcon className="mb-3" />}
+        <div className="flex flex-col gap-3 mb-3 max-h-[45vh] overflow-y-auto pr-1">
+          {aiChatMessages.map((msg, i) => (
+            <div
+              key={i}
+              className={`rounded px-3 py-2 text-sm ${
+                msg.role === "user"
+                  ? "bg-[#e6f4ff] ml-6"
+                  : "bg-[#f5f5f5] mr-6"
+              }`}
+            >
+              <Typography.Text type="secondary" className="text-xs">{msg.role === "user" ? "我" : "AI"}</Typography.Text>
+              <div className="mt-1 whitespace-pre-wrap">{msg.content}</div>
+            </div>
+          ))}
+          {aiChatLoading && (
+            <div className="rounded px-3 py-2 bg-[#f5f5f5] mr-6">
+              <Spin size="small" /> 思考中…
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <Input.TextArea
+            placeholder="输入问题…"
+            value={aiChatInput}
+            onChange={(e) => setAiChatInput(e.target.value)}
+            onPressEnter={(e) => { if (!e.shiftKey) { e.preventDefault(); sendAiChat(aiChatInput); } }}
+            rows={2}
+            disabled={aiChatLoading}
+          />
+          <Button type="primary" onClick={() => sendAiChat(aiChatInput)} loading={aiChatLoading}>
+            发送
+          </Button>
+        </div>
+      </Drawer>
 
       <Modal
         title="确认退稿"

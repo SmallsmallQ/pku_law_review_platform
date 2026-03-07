@@ -14,7 +14,7 @@ export default function CopyrightPage() {
   return (
     <div className="bg-[#f5f6f8]">
       <HeaderBar />
-      <main className="mx-auto max-w-2xl px-4 py-8">
+      <main className="w-full px-5 py-8 sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
         <Card>
           <Title level={4} className="!mb-6 !border-l-4 !border-[#8B1538] !pl-4">
             {COPYRIGHT_AGREEMENT_TITLE}

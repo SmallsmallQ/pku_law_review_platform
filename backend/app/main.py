@@ -2,12 +2,16 @@
 中外法学智能编审系统 — FastAPI 入口。
 """
 from contextlib import asynccontextmanager
+import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.api.v1 import router as api_v1
+
+logger = logging.getLogger("uvicorn.error")
 
 
 @asynccontextmanager
@@ -34,6 +38,12 @@ app.add_middleware(
 )
 
 app.include_router(api_v1, prefix="/api/v1", tags=["v1"])
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path, exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 
 @app.get("/health")

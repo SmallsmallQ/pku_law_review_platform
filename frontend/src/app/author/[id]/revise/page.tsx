@@ -62,7 +62,7 @@ export default function AuthorRevisePage() {
   return (
     <div className="bg-[#f5f6f8]">
       <HeaderBar />
-      <main className="mx-auto max-w-lg px-4 py-8">
+      <main className="w-full px-5 py-8 sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
         <Card>
           <Breadcrumb items={breadcrumbItems} className="mb-4" />
           <Typography.Title level={5} className="!mb-4">

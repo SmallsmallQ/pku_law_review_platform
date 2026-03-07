@@ -20,6 +20,14 @@ else:
 if "+asyncpg" in _sync_url:
     _sync_url = _sync_url.replace("postgresql+asyncpg", "postgresql", 1)
 
+# 兼容相对 SQLite 路径：统一转为 backend 目录下的绝对路径，避免不同启动目录连错库。
+if _sync_url.startswith("sqlite:///") and not _sync_url.startswith("sqlite:////"):
+    sqlite_path = _sync_url[len("sqlite:///") :]
+    if sqlite_path and sqlite_path != ":memory:" and not Path(sqlite_path).is_absolute():
+        backend_root = Path(__file__).resolve().parent.parent.parent
+        sqlite_abs = (backend_root / sqlite_path).resolve().as_posix()
+        _sync_url = f"sqlite:///{sqlite_abs}"
+
 _connect_args = {}
 if _sync_url.startswith("sqlite"):
     _connect_args["check_same_thread"] = False

@@ -39,26 +39,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="flex flex-col bg-[#f5f6f8]">
       <HeaderBar />
-      <Layout className="flex-1 mx-auto w-full max-w-6xl px-4 py-4">
-        <div className="flex gap-6 w-full">
-          {/* Tabler-style 侧边栏 */}
-          <aside className="w-52 shrink-0">
-            <div className="rounded-lg border border-[#e0ddd8] bg-white p-2 shadow-sm">
-              <div className="px-3 py-2 text-xs font-semibold text-[#666] uppercase tracking-wider">
-                管理后台
-              </div>
-              <Menu
-                selectedKeys={[selectedKey]}
-                mode="inline"
-                className="!border-0"
-                items={adminNavItems.map((item) => ({
-                  key: item.key,
-                  label: <Link href={item.key}>{item.label}</Link>,
-                }))}
-              />
+      <Layout className="flex-1 w-full px-5 py-4 sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
+        <div className="flex w-full gap-6 border-t border-[#dfe3ea] pt-4">
+          <aside className="w-52 shrink-0 border-r border-[#dfe3ea] pr-4">
+            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[#666]">
+              管理后台
             </div>
+            <Menu
+              selectedKeys={[selectedKey]}
+              mode="inline"
+              className="!border-0 !bg-transparent"
+              items={adminNavItems.map((item) => ({
+                key: item.key,
+                label: <Link href={item.key}>{item.label}</Link>,
+              }))}
+            />
           </aside>
-          <Content className="flex-1 min-w-0 rounded-lg border border-[#e0ddd8] bg-white p-6 shadow-sm">
+          <Content className="flex-1 min-w-0 p-2">
             {children}
           </Content>
         </div>

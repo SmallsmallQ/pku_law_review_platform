@@ -54,8 +54,8 @@ export default function HomePage() {
           aria-hidden
         />
         <div className="absolute inset-0 z-10 bg-[rgba(101,18,44,0.22)]" aria-hidden />
-        <div className="relative z-20 mx-auto flex min-h-[320px] max-w-6xl flex-col items-center justify-center px-6 py-16 text-center text-white md:min-h-[360px]">
-          <Title level={1} className="!mb-3 !text-white !tracking-tight drop-shadow md:!text-4xl lg:!text-5xl">
+        <div className="relative z-20 flex min-h-[320px] w-full flex-col items-center justify-center px-6 py-16 text-center text-white md:min-h-[360px] sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
+          <Title level={1} className="font-serif-sc !mb-3 !text-white !tracking-tight drop-shadow md:!text-4xl lg:!text-5xl">
             《中外法学》
           </Title>
           <Text className="text-lg text-white/95 md:text-xl">北京大学法学院主办 · 法学类核心期刊</Text>
@@ -70,7 +70,7 @@ export default function HomePage() {
           aria-hidden
         />
         <section className="relative z-10">
-          <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+          <div className="w-full px-4 sm:px-6 lg:px-8 2xl:px-10">
             <div className="border-b border-[#d7dce5] py-5 text-base text-[#4f5563]">
               目录与全文以官网为准，本系统用于投稿、审稿流转与作者回传。
             </div>
@@ -78,7 +78,7 @@ export default function HomePage() {
             <div className="relative grid lg:grid-cols-[280px_minmax(0,1fr)_320px]">
               <aside className="border-b border-[#dfe4ec] py-8 lg:border-b-0 lg:border-r lg:pr-8">
               <Text className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#8B1538]">Peking University Law Journal</Text>
-              <Title level={2} className="!mb-0 !mt-4 !text-[40px] !font-semibold !tracking-tight !text-[#2d313d] whitespace-nowrap">
+              <Title level={2} className="font-serif-sc !mb-0 !mt-4 !text-[40px] !font-semibold !tracking-tight !text-[#2d313d] whitespace-nowrap">
                 《中外法学》
               </Title>
               <div className="mt-5 space-y-1 text-[18px] leading-8 text-[#5f6573]">
@@ -98,7 +98,7 @@ export default function HomePage() {
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#e6eaf0] pb-5">
                 <div>
                   <Text className="text-sm font-semibold uppercase tracking-[0.14em] text-[#8B1538]">当期目录</Text>
-                  <Title level={3} className="!mb-0 !mt-2 !text-[38px] !font-semibold !text-[#2e3340] whitespace-nowrap">第 38 卷（2026）第 1 期</Title>
+                  <Title level={3} className="font-serif-sc !mb-0 !mt-2 !text-[38px] !font-semibold !text-[#2e3340] whitespace-nowrap">第 38 卷（2026）第 1 期</Title>
                 </div>
                 <a href="https://www.law.pku.edu.cn/" target="_blank" rel="noopener noreferrer" className="text-[18px] font-semibold text-[#8B1538] hover:underline">
                   MORE+

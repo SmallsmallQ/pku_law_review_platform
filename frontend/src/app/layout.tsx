@@ -20,6 +20,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className="flex min-h-screen flex-col">
         <a
           href="#main-content"

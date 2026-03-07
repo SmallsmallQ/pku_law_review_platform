@@ -1,6 +1,7 @@
 """
 编辑端：稿件列表、详情、操作（状态变更、退修、退稿、录用）。见 docs/api-spec.md。
 """
+import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -13,7 +14,7 @@ from app.config import settings
 from app.core.deps import RequireEditor, get_current_user, get_current_user_for_download
 from app.core.storage import resolve_path
 from app.db.base import get_db
-from app.models import EditorAction, Manuscript, ManuscriptVersion, User, ManuscriptParsed, ReviewReport
+from app.models import EditorAction, Manuscript, ManuscriptVersion, User, ManuscriptParsed, ReviewReport, RevisionTemplate
 from app.services.llm import chat_completion, is_llm_configured
 from app.services.review_service import generate_full_ai_report
 
@@ -69,7 +70,6 @@ def editor_manuscript_list(
         )
     total = q.count()
     items = q.order_by(Manuscript.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
-    report_content, report_model = _normalize_report_payload(report_obj)
 
     return {
         "items": [
@@ -118,6 +118,7 @@ def editor_manuscript_detail(
 
     # 编辑操作历史
     actions = db.query(EditorAction).filter(EditorAction.manuscript_id == id).order_by(EditorAction.created_at.desc()).limit(50).all()
+    report_content, report_model = _normalize_report_payload(report_obj)
     
     return {
         "manuscript": {
@@ -226,11 +227,21 @@ def _normalize_report_payload(report_obj: ReviewReport | None) -> tuple[str, str
     if not report_obj:
         return "", settings.llm_model
     raw = report_obj.content
+    if raw is None:
+        return "", settings.llm_model
     if isinstance(raw, dict):
         content = raw.get("text", "")
         model = raw.get("model") or settings.llm_model
+    elif isinstance(raw, str):
+        try:
+            data = json.loads(raw)
+            content = data.get("text", "") if isinstance(data, dict) else raw
+            model = data.get("model", settings.llm_model) if isinstance(data, dict) else settings.llm_model
+        except (TypeError, ValueError):
+            content = raw
+            model = settings.llm_model
     else:
-        content = raw
+        content = str(raw)
         model = settings.llm_model
     return str(content or ""), str(model or settings.llm_model)
 
@@ -269,6 +280,124 @@ def editor_ai_review(
 
     content, model = _normalize_report_payload(report)
     return AiReviewResponse(content=content, model=model)
+
+
+class AiChatBody(BaseModel):
+    message: str
+
+
+class AiChatResponse(BaseModel):
+    content: str
+    model: str
+
+
+def _build_manuscript_context(db: Session, manuscript_id: int) -> str:
+    """拼当前稿件上下文（标题、摘要、关键词、报告摘要），供 AI 对话使用。"""
+    m = db.query(Manuscript).filter(Manuscript.id == manuscript_id).first()
+    if not m:
+        return ""
+    parts = [f"稿件编号：{m.manuscript_no}", f"标题：{m.title or '（无）'}"]
+    if m.current_version_id:
+        parsed = db.query(ManuscriptParsed).filter(ManuscriptParsed.version_id == m.current_version_id).first()
+        if parsed:
+            parts.append(f"摘要：{(parsed.abstract or '（未识别）')[:800]}")
+            parts.append(f"关键词：{(parsed.keywords or '（未识别）')[:300]}")
+        report_obj = db.query(ReviewReport).filter(
+            ReviewReport.manuscript_id == manuscript_id,
+            ReviewReport.version_id == m.current_version_id,
+            ReviewReport.report_type == "preliminary",
+        ).first()
+        if report_obj and report_obj.content:
+            raw = report_obj.content
+            text = (raw.get("text", "") if isinstance(raw, dict) else raw) or ""
+            if text:
+                parts.append(f"初审报告摘要（前 1200 字）：{text[:1200]}")
+    return "\n\n".join(parts)
+
+
+@router.post("/manuscripts/{id}/ai-chat", response_model=AiChatResponse)
+def editor_ai_chat(
+    id: int,
+    body: AiChatBody,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(RequireEditor)],
+):
+    """编辑端：基于当前稿件的智能对话。后端注入稿件上下文后调用大模型。"""
+    if not is_llm_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="未配置大模型（请在 .env 中设置 DASHSCOPE_API_KEY）",
+        )
+    m = db.query(Manuscript).filter(Manuscript.id == id).first()
+    if not m:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
+    context = _build_manuscript_context(db, id)
+    if not context.strip():
+        context = f"稿件编号：{m.manuscript_no}，标题：{m.title or '（无）'}"
+    system_prompt = "你是法学期刊编辑助手。当前对话围绕以下稿件信息，请基于提供的内容专业、简洁地回答编辑的问题。"
+    user_content = f"【当前稿件信息】\n\n{context}\n\n【编辑的问题】\n{body.message.strip()}"
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_content},
+    ]
+    try:
+        content = chat_completion(messages, max_tokens=2048)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    return AiChatResponse(content=content, model=settings.llm_model)
+
+
+class RevisionDraftResponse(BaseModel):
+    draft: str
+
+
+@router.post("/manuscripts/{id}/revision-draft", response_model=RevisionDraftResponse)
+def editor_revision_draft(
+    id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(RequireEditor)],
+):
+    """编辑端：根据当前稿件 AI 初审报告与退修模板，生成退修意见草稿。"""
+    try:
+        if not is_llm_configured():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="未配置大模型（请在 .env 中设置 DASHSCOPE_API_KEY）",
+            )
+        m = db.query(Manuscript).filter(Manuscript.id == id).first()
+        if not m:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
+        if not m.current_version_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该稿件尚无版本，无法生成退修意见")
+        report_obj = db.query(ReviewReport).filter(
+            ReviewReport.manuscript_id == id,
+            ReviewReport.version_id == m.current_version_id,
+            ReviewReport.report_type == "preliminary",
+        ).first()
+        report_text, _ = _normalize_report_payload(report_obj)
+        templates = db.query(RevisionTemplate).filter(RevisionTemplate.is_active.is_(True)).order_by(RevisionTemplate.id).all()
+        template_block = "\n\n".join(
+            f"【{t.name or '模板'}】\n{str(t.content or '')}" for t in templates
+        ) if templates else "（暂无退修模板，请管理员在后台配置）"
+        prompt_instruction = """请根据以下「初审报告」和「本刊退修模板要求」，生成一段给作者的退修意见草稿。
+要求：简洁、专业、直接面向作者；条理清晰；可分点列出主要修改方向；不要简单复述报告全文。"""
+        user_content = f"""## 初审报告\n{report_text[:8000] if report_text else '（暂无初审报告，请先生成 AI 初审报告）'}\n\n## 本刊退修模板（可参考）\n{template_block}\n\n请直接输出退修意见正文，不要加「草稿」等前缀。"""
+        messages = [
+            {"role": "system", "content": prompt_instruction},
+            {"role": "user", "content": user_content},
+        ]
+        draft = chat_completion(messages, max_tokens=1500)
+        draft = (draft or "").strip()
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"生成退修意见草稿时出错: {e!s}",
+        )
+    return RevisionDraftResponse(draft=draft)
 
 
 @router.get("/manuscripts/{id}/files/{version_id}/download")

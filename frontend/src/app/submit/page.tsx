@@ -293,7 +293,7 @@ export default function SubmitPage() {
   return (
     <div className="bg-[#f5f6f8] text-[#1d1d1f]">
       <HeaderBar />
-      <main className="mx-auto max-w-[1240px] px-5 pb-20 pt-10 sm:px-8 sm:pt-12">
+      <main className="w-full px-5 pb-20 pt-10 sm:px-8 sm:pt-12 lg:px-10 xl:px-12 2xl:px-16">
         <section className="mb-8 border-b border-[#d9d9df] pb-6">
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#6e6e73]">
             在线投稿系统

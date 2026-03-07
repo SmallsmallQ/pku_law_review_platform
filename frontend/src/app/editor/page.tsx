@@ -43,6 +43,8 @@ export default function EditorWorkbenchPage() {
   const [aiReviewLoading, setAiReviewLoading] = useState(false);
   const [aiReport, setAiReport] = useState<{ content: string; model: string } | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [revisionDraftLoading, setRevisionDraftLoading] = useState(false);
+  const [revisionDraftError, setRevisionDraftError] = useState<string | null>(null);
 
   const loadList = useCallback(async () => {
     setLoadingList(true);
@@ -136,6 +138,21 @@ export default function EditorWorkbenchPage() {
     }
   };
 
+  const runRevisionDraft = useCallback(async () => {
+    if (!selectedId) return;
+    setRevisionDraftError(null);
+    setRevisionDraftLoading(true);
+    try {
+      const res = await editorApi.revisionDraft(selectedId);
+      setRevisionComment(res.draft);
+      message.success("已填入退修意见草稿，可修改后提交");
+    } catch (e) {
+      setRevisionDraftError(e instanceof Error ? e.message : "生成失败");
+    } finally {
+      setRevisionDraftLoading(false);
+    }
+  }, [selectedId]);
+
   const manuscript = detail?.manuscript as Record<string, unknown> | undefined;
   const currentVersion = detail?.current_version as Record<string, unknown> | undefined;
   const parsed = detail?.parsed as Record<string, unknown> | undefined;
@@ -175,7 +192,7 @@ export default function EditorWorkbenchPage() {
   return (
     <div className="bg-[#f5f6f8]">
       <HeaderBar />
-      <main className="mx-auto max-w-[1500px] px-4 py-6">
+      <main className="w-full px-5 py-6 sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(420px,1fr)_380px]">
           <Card
             size="small"
@@ -244,6 +261,19 @@ export default function EditorWorkbenchPage() {
                   <div className="text-xs text-[#888] mt-1">{String(manuscript?.manuscript_no ?? "")}</div>
                 </div>
 
+                <div className="mb-1">
+                  <Button
+                    type="dashed"
+                    size="small"
+                    onClick={runRevisionDraft}
+                    loading={revisionDraftLoading}
+                  >
+                    {revisionDraftLoading ? "生成中…" : "AI 生成退修意见草稿"}
+                  </Button>
+                  {revisionDraftError && (
+                    <Typography.Text type="danger" className="ml-2 text-sm">{revisionDraftError}</Typography.Text>
+                  )}
+                </div>
                 <TextArea
                   rows={7}
                   value={revisionComment}

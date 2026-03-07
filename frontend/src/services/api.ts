@@ -130,6 +130,16 @@ export const editorApi = {
   /** 生成 AI 初审报告 */
   generateAiReview: (id: number) =>
     request<{ content: string; model: string }>(`editor/manuscripts/${id}/ai-review`, { method: "POST" }),
+  /** 基于当前稿件的 AI 对话（后端注入上下文） */
+  aiChat: (id: number, message: string) =>
+    request<{ content: string; model: string }>(`editor/manuscripts/${id}/ai-chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    }),
+  /** 生成退修意见草稿（基于初审报告与退修模板） */
+  revisionDraft: (id: number) =>
+    request<{ draft: string }>(`editor/manuscripts/${id}/revision-draft`, { method: "POST" }),
 };
 
 /** 阿里云百炼大模型：仅编辑可用 */

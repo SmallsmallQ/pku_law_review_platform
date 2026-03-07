@@ -140,7 +140,7 @@ export default function AuthorCenterPage() {
   return (
     <div className="bg-[#f5f6f8]">
       <HeaderBar />
-      <main id="main-content" className="mx-auto max-w-5xl px-4 py-8" aria-label="我的稿件">
+      <main id="main-content" className="w-full px-5 py-8 sm:px-8 lg:px-10 xl:px-12 2xl:px-16" aria-label="我的稿件">
         <Card title="个人资料" className="mb-6">
           <Form form={profileForm} layout="vertical" onFinish={handleSaveProfile}>
             <Form.Item label="登录邮箱">
