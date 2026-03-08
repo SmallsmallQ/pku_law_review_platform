@@ -43,6 +43,8 @@ export default function EditorWorkbenchPage() {
   const [aiReviewLoading, setAiReviewLoading] = useState(false);
   const [aiReport, setAiReport] = useState<{ content: string; model: string } | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  /** 仅当本稿报告是本次会话中“刚生成”的才启用打字机效果 */
+  const [typewriterForReportId, setTypewriterForReportId] = useState<number | null>(null);
   const [revisionDraftLoading, setRevisionDraftLoading] = useState(false);
   const [revisionDraftError, setRevisionDraftError] = useState<string | null>(null);
 
@@ -99,6 +101,10 @@ export default function EditorWorkbenchPage() {
   }, [user, authLoading, router, loadList]);
 
   useEffect(() => {
+    setTypewriterForReportId(null);
+  }, [selectedId]);
+
+  useEffect(() => {
     if (!selectedId) return;
     loadDetail(selectedId);
   }, [selectedId, loadDetail]);
@@ -129,6 +135,7 @@ export default function EditorWorkbenchPage() {
     try {
       const res = await editorApi.generateAiReview(selectedId);
       setAiReport(res);
+      setTypewriterForReportId(selectedId);
       message.success("AI 初审报告已生成");
       await loadDetail(selectedId);
     } catch (e) {
@@ -309,7 +316,7 @@ export default function EditorWorkbenchPage() {
                       AI 初审报告{aiReport.model ? `（${aiReport.model}）` : ""}
                     </div>
                     <div className="h-[52vh] min-h-[320px] max-h-[560px] overflow-y-auto pr-1">
-                      <TypewriterMarkdown content={aiReport.content} />
+                      <TypewriterMarkdown content={aiReport.content} enabled={typewriterForReportId === selectedId} />
                     </div>
                   </div>
                 ) : null}

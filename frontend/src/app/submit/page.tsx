@@ -54,10 +54,12 @@ type FundRow = {
 
 const PLAN_OPTIONS = [
   { label: "法理学研究", value: "jurisprudence" },
+  { label: "宪法行政学研究", value: "jurisprudence" },
   { label: "民商法研究", value: "civil-commercial" },
   { label: "刑法研究", value: "criminal" },
   { label: "诉讼法研究", value: "procedure" },
   { label: "国际法研究", value: "international" },
+  { label: "新技术法学", value: "new-technology" },
 ];
 
 function formatBytes(size?: number) {

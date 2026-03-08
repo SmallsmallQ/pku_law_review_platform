@@ -26,7 +26,7 @@ def _normalized_api_key() -> str:
     return key
 
 
-def _client() -> OpenAI | None:
+def _client(timeout: int | None = None) -> OpenAI | None:
     """返回配置好的 OpenAI 兼容客户端；未配置 API Key 时返回 None。"""
     api_key = _normalized_api_key()
     if not api_key:
@@ -34,7 +34,7 @@ def _client() -> OpenAI | None:
     return OpenAI(
         api_key=api_key,
         base_url=settings.llm_base_url.strip() or "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        timeout=LLM_REQUEST_TIMEOUT,
+        timeout=timeout if timeout is not None else LLM_REQUEST_TIMEOUT,
     )
 
 
@@ -42,13 +42,15 @@ def chat_completion(
     messages: list[dict[str, str]],
     model: str | None = None,
     max_tokens: int = 2048,
+    timeout: int | None = None,
 ) -> str:
     """
     调用百炼对话接口，返回助手回复文本。
     messages 格式: [{"role": "user"|"system"|"assistant", "content": "..."}]
     未配置 DASHSCOPE_API_KEY 时抛出 ValueError。
+    timeout: 可选，本次请求超时秒数，未指定时使用 LLM_REQUEST_TIMEOUT。
     """
-    client = _client()
+    client = _client(timeout=timeout)
     if client is None:
         raise ValueError("未配置 DASHSCOPE_API_KEY，请在 .env 中设置阿里云百炼 API Key")
     model = (model or "").strip() or settings.llm_model

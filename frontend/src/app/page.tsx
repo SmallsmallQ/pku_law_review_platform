@@ -20,6 +20,7 @@ const serviceLinks = [
   { label: "作者中心", href: "/author" },
   { label: "投稿入口", href: "/submit" },
   { label: "编辑工作台", href: "/editor" },
+  { label: "AI 检测", href: "/ai-detect" },
   { label: "版权转让协议", href: "/copyright" },
 ];
 
@@ -59,16 +60,11 @@ export default function HomePage() {
             《中外法学》
           </Title>
           <Text className="text-lg text-white/95 md:text-xl">北京大学法学院主办 · 法学类核心期刊</Text>
-          <Text className="mt-2 block text-sm text-white/80">智能编审系统 — 投稿管理 · AI 辅助初审</Text>
+          <Text className="mt-2 block text-sm text-white/80">智能编审系统</Text>
         </div>
       </section>
 
       <main id="main-content" className="relative pb-0" aria-label="主内容">
-        <div
-          className="pointer-events-none absolute inset-0 z-0 opacity-[0.06]"
-          style={{ backgroundImage: "url(/banner.jpg)", backgroundPosition: "center", backgroundSize: "cover" }}
-          aria-hidden
-        />
         <section className="relative z-10">
           <div className="w-full px-4 sm:px-6 lg:px-8 2xl:px-10">
             <div className="border-b border-[#d7dce5] py-5 text-base text-[#4f5563]">

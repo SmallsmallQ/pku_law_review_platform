@@ -41,6 +41,8 @@ export default function EditorManuscriptDetailPage() {
   const [aiReviewLoading, setAiReviewLoading] = useState(false);
   const [aiReport, setAiReport] = useState<{ content: string; model: string } | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  /** 仅当报告是本次会话中“刚生成”的才启用打字机效果 */
+  const [reportJustGenerated, setReportJustGenerated] = useState(false);
   const [previewType, setPreviewType] = useState<"pdf" | "docx" | "doc" | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [docxPreviewText, setDocxPreviewText] = useState("");
@@ -56,6 +58,10 @@ export default function EditorManuscriptDetailPage() {
   // 退修意见草稿
   const [revisionDraftLoading, setRevisionDraftLoading] = useState(false);
   const [revisionDraftError, setRevisionDraftError] = useState<string | null>(null);
+  // 引注检查
+  const [citationCheckLoading, setCitationCheckLoading] = useState(false);
+  const [citationCheckError, setCitationCheckError] = useState<string | null>(null);
+  const [citationCheckUseLlm, setCitationCheckUseLlm] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -66,7 +72,10 @@ export default function EditorManuscriptDetailPage() {
       setDetail(d as Record<string, unknown>);
       if ((d as any).report) {
         setAiReport((d as any).report);
+      } else {
+        setAiReport(null);
       }
+      setReportJustGenerated(false);
     } catch (e) {
       setDetail(null);
       setLoadError(e instanceof Error ? e.message : "加载失败，请刷新重试");
@@ -91,6 +100,7 @@ export default function EditorManuscriptDetailPage() {
     try {
       const res = await editorApi.generateAiReview(Number(id));
       setAiReport(res);
+      setReportJustGenerated(true);
     } catch (e) {
       setAiError(e instanceof Error ? e.message : "生成失败");
     } finally {
@@ -141,6 +151,20 @@ export default function EditorManuscriptDetailPage() {
     }
   }, [id]);
 
+  const runCitationCheck = useCallback(async () => {
+    if (!id) return;
+    setCitationCheckError(null);
+    setCitationCheckLoading(true);
+    try {
+      const res = await editorApi.runCitationCheck(Number(id), { use_llm: citationCheckUseLlm });
+      setDetail((prev) => (prev ? { ...prev, citation_issues: res.issues } : null));
+    } catch (e) {
+      setCitationCheckError(e instanceof Error ? e.message : "引注检查失败");
+    } finally {
+      setCitationCheckLoading(false);
+    }
+  }, [id, citationCheckUseLlm]);
+
   const runAction = async (actionType: string, comment?: string) => {
     if (!id) return;
     setActionLoading(true);
@@ -174,6 +198,7 @@ export default function EditorManuscriptDetailPage() {
   const currentVersion = detail?.current_version as Record<string, unknown> | undefined;
   const parsed = detail?.parsed as Record<string, unknown> | undefined;
   const editorActions = (detail?.editor_actions as Record<string, unknown>[]) || [];
+  const citationIssues = (detail?.citation_issues as { location: string; description: string; suggestion?: string }[]) || [];
   const status = manuscript?.status as string | undefined;
   const manuscriptNo = manuscript?.manuscript_no as string | undefined;
   const title = manuscript?.title as string | undefined;
@@ -371,6 +396,57 @@ export default function EditorManuscriptDetailPage() {
                   </div>
                 )}
               </Card>
+              <Card size="small" title="引注检查" className="mb-4">
+                <Typography.Paragraph type="secondary" className="text-sm mb-3">
+                  依据《法学引注手册（第二版）》自动检查脚注格式、文献要素（出版社、页码）、法条与案例引用规范。链接、网页、公众号等非正式文献不强制要求页码。
+                </Typography.Paragraph>
+                <Space wrap className="mb-2" align="center">
+                  <Button
+                    type="default"
+                    onClick={runCitationCheck}
+                    loading={citationCheckLoading}
+                  >
+                    {citationCheckLoading ? "检查中…" : "运行引注检查"}
+                  </Button>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600">
+                    <input
+                      type="checkbox"
+                      checked={citationCheckUseLlm}
+                      onChange={(e) => setCitationCheckUseLlm(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    使用大模型辅助判断
+                  </label>
+                </Space>
+                {citationCheckError && (
+                  <Alert message={citationCheckError} type="error" showIcon className="mb-2" />
+                )}
+                {citationIssues.length > 0 && (
+                  <div className="mt-3">
+                    <Typography.Text strong className="block mb-2">
+                      发现 {citationIssues.length} 处引注问题
+                    </Typography.Text>
+                    <List
+                      size="small"
+                      dataSource={citationIssues}
+                      renderItem={(item) => (
+                        <List.Item>
+                          <div>
+                            <Typography.Text strong>[{item.location}]</Typography.Text>
+                            <Typography.Text className="ml-2">{item.description}</Typography.Text>
+                            {item.suggestion && (
+                              <div className="mt-1 text-gray-500 text-sm">{item.suggestion}</div>
+                            )}
+                          </div>
+                        </List.Item>
+                      )}
+                    />
+                  </div>
+                )}
+                {!citationCheckLoading && citationIssues.length === 0 && (
+                  <Typography.Text type="secondary" className="text-sm">运行检查后将在此显示脚注、文献、法条与案例引用中的问题；若无问题则显示「发现 0 处引注问题」。</Typography.Text>
+                )}
+              </Card>
               <Card size="small" title="操作" className="mb-4">
                 {aiReviewLoading && (
                   <Alert message="正在生成 AI 初审报告，预计需要 10–30 秒，请稍候。" type="info" showIcon className="mb-3" />
@@ -420,7 +496,7 @@ export default function EditorManuscriptDetailPage() {
                     模型：{aiReport.model}
                   </Typography.Text>
                   <div className="h-[52vh] min-h-[320px] max-h-[560px] overflow-y-auto pr-1">
-                    <TypewriterMarkdown content={aiReport.content} />
+                    <TypewriterMarkdown content={aiReport.content} enabled={reportJustGenerated} />
                   </div>
                 </Card>
               )}

@@ -12,6 +12,27 @@
   font-family: "Noto Serif SC", "Source Han Serif SC", serif;
 }
 
+/* 顶栏：禁止出现任何滚动条，并限制内部溢出 */
+.app-header,
+.app-header .ant-menu-horizontal,
+.app-header .ant-menu-horizontal > .ant-menu-content {
+  overflow: hidden !important;
+}
+.app-header .ant-menu-horizontal > .ant-menu-content {
+  max-width: 100%;
+}
+
+/* 顶栏导航在深色背景下：选中项下划线为白色 */
+.header-nav-menu.ant-menu-horizontal .ant-menu-item-selected::after {
+  border-bottom-color: #fff !important;
+}
+.header-nav-menu.ant-menu-horizontal .ant-menu-item::after {
+  border-bottom-color: transparent;
+}
+.header-nav-menu.ant-menu-horizontal .ant-menu-item:hover::after {
+  border-bottom-color: rgba(255, 255, 255, 0.5);
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;

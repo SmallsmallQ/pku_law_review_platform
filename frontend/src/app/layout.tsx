@@ -37,9 +37,16 @@ export default function RootLayout({
           <ConfigProvider theme={theme} locale={zhCN}>
             <AuthProvider>
               <DocumentTitle />
-              <div className="flex flex-1 flex-col">
-                {children}
-                <Footer />
+              <div className="relative flex min-h-screen flex-1 flex-col bg-[#f5f6f8]">
+                <div
+                  className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-[0.06]"
+                  style={{ backgroundImage: "url(/banner.jpg)", backgroundPosition: "center", backgroundSize: "cover" }}
+                  aria-hidden
+                />
+                <div className="relative z-10 flex flex-1 flex-col">
+                  {children}
+                  <Footer />
+                </div>
               </div>
             </AuthProvider>
           </ConfigProvider>

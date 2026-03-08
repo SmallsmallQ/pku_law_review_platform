@@ -1,6 +1,9 @@
 """
 稿件相关：创建、我的列表、详情、版本、退修意见、修订稿上传、下载。见 docs/api-spec.md。
 """
+import os
+import tempfile
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, status, UploadFile, BackgroundTasks
@@ -11,7 +14,8 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_user, get_current_user_for_download
 from app.core.storage import ALLOWED_EXTENSIONS, resolve_path, save_manuscript_file, save_supplement_file
 from app.db.base import get_db
-from app.models import EditorAction, Manuscript, ManuscriptVersion, User
+from app.models import EditorAction, Manuscript, ManuscriptVersion, ManuscriptParsed, User
+from app.services.parser import parse_manuscript
 from app.services.review_service import process_manuscript_parsing
 from app.schemas.manuscript import (
     ManuscriptCreateResponse,
@@ -167,6 +171,37 @@ def my_manuscripts(
     }
 
 
+# ---------- 上传 Word/PDF 提取正文（用于 AI 检测等，不落库） ----------
+@router.post("/extract-text")
+def extract_text_from_file(
+    user: Annotated[User, Depends(get_current_user)],
+    file: Annotated[UploadFile, File()],
+):
+    """上传单个 Word/PDF 文件，提取正文文本返回，用于 AI 检测页等。不存储文件。"""
+    if not file.filename:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请选择文件")
+    ext = "." + (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
+    if ext not in (".docx", ".pdf"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="仅支持 .docx（Word）或 .pdf 格式",
+        )
+    content = file.file.read()
+    suffix = ext
+    fd = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    try:
+        fd.write(content)
+        fd.close()
+        data = parse_manuscript(fd.name)
+        text = (data.get("body_text") or "").strip()
+        if not text and data.get("abstract"):
+            text = (data.get("abstract") or "").strip()
+        return {"text": text or ""}
+    finally:
+        if os.path.exists(fd.name):
+            os.unlink(fd.name)
+
+
 # ---------- 稿件详情（作者视角） ----------
 @router.get("/{id}", response_model=ManuscriptDetailResponse)
 def manuscript_detail(
@@ -181,6 +216,28 @@ def manuscript_detail(
     if m.submitted_by != user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
     return _manuscript_detail(m)
+
+
+# ---------- 获取稿件正文（用于 AI 检测导入） ----------
+@router.get("/{id}/text-for-ai-detect")
+def manuscript_text_for_ai_detect(
+    id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    """返回本人已投稿稿件的正文文本，供 AI 检测页导入。若该版本尚未解析则无正文。"""
+    m = db.query(Manuscript).filter(Manuscript.id == id).first()
+    if not m or m.submitted_by != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
+    if not m.current_version_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该稿件暂无版本或未解析")
+    parsed = db.query(ManuscriptParsed).filter(ManuscriptParsed.version_id == m.current_version_id).first()
+    if not parsed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="该版本尚未解析出正文，请稍后再试")
+    text = (parsed.body_text or "").strip()
+    if not text and parsed.abstract:
+        text = (parsed.abstract or "").strip()
+    return {"text": text or ""}
 
 
 # ---------- 稿件版本列表 ----------

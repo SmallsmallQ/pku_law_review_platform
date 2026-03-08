@@ -26,15 +26,18 @@ def _clip_text_for_review(text: str, max_chars: int) -> tuple[str, bool]:
 def process_manuscript_parsing(db: Session, version_id: int):
     """解析稿件并保存解析结果。"""
     version = db.query(ManuscriptVersion).filter(ManuscriptVersion.id == version_id).first()
-    if not version:
+    if not version or not (getattr(version, "file_path", None) or "").strip():
         return None
-    
-    file_path = resolve_path(version.file_path)
+    try:
+        file_path = resolve_path(version.file_path)
+    except (TypeError, ValueError):
+        return None
     if not file_path.exists():
         return None
-    
-    # 调用解析器
-    parsed_data = parse_manuscript(str(file_path))
+    try:
+        parsed_data = parse_manuscript(str(file_path))
+    except Exception:
+        return None
     
     # 更新版本信息（字数、解析时间）
     version.word_count = parsed_data.get("word_count", 0)
@@ -54,8 +57,12 @@ def process_manuscript_parsing(db: Session, version_id: int):
     parsed_obj.footnotes_raw = parsed_data.get("footnotes_raw")
     parsed_obj.references_raw = parsed_data.get("references_raw")
     parsed_obj.author_info = parsed_data.get("author_info")
-    
-    db.commit()
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        return None
     return parsed_obj
 
 def generate_full_ai_report(db: Session, manuscript_id: int, version_id: int) -> Optional[ReviewReport]:
@@ -68,8 +75,10 @@ def generate_full_ai_report(db: Session, manuscript_id: int, version_id: int) ->
     if not m or not v:
         return None
     
-    # 每次生成报告前都重新解析，避免沿用旧的解析缓存导致脚注/摘要信息滞后
+    # 每次生成报告前都重新解析，避免沿用旧的解析缓存导致脚注/摘要信息滞后；失败则尝试使用已有解析结果
     parsed = process_manuscript_parsing(db, version_id)
+    if not parsed:
+        parsed = db.query(ManuscriptParsed).filter(ManuscriptParsed.version_id == version_id).first()
     if not parsed:
         return None
 
@@ -153,9 +162,20 @@ def generate_full_ai_report(db: Session, manuscript_id: int, version_id: int) ->
         
         report.content = {"text": content, "model": settings.llm_model}
         report.generated_at = datetime.now()
-        
-        db.commit()
+
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
         return report
-    except Exception as e:
-        print(f"Error generating AI report: {e}")
+    except ValueError:
+        raise  # 让上层转为 502 并返回具体原因（如未配置 API Key、超时）
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        try:
+            db.rollback()
+        except Exception:
+            pass
         return None
