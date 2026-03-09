@@ -1,7 +1,7 @@
 """
 管理员端：用户、栏目、退修模板、配置、统计。仅 admin 角色。见 docs/api-spec.md。
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Response, Query, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
@@ -288,6 +288,37 @@ def update_user(
         is_active=user.is_active,
         created_at=user.created_at.isoformat() if user.created_at else "",
     )
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: int,
+    current_user: User = Depends(RequireAdmin),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能删除当前登录账号")
+
+    if user.role == "admin":
+        admin_total = db.query(User).filter(User.role == "admin").count()
+        if admin_total <= 1:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能删除系统最后一个管理员")
+        if user.is_active:
+            active_admin_total = db.query(User).filter(User.role == "admin", User.is_active.is_(True)).count()
+            if active_admin_total <= 1:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能删除系统最后一个启用中的管理员")
+
+    if db.query(Manuscript).filter(Manuscript.submitted_by == user.id).count() > 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该用户已有投稿记录，不能删除，请改为停用")
+    if db.query(EditorAction).filter(EditorAction.editor_id == user.id).count() > 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该用户已有处理记录，不能删除，请改为停用")
+
+    db.delete(user)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ----- Sections -----

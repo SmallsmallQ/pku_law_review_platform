@@ -24,7 +24,7 @@ import HeaderBar from "@/components/HeaderBar";
 import MarkdownRenderer from "@/components/ui/MarkdownRenderer";
 import TypewriterMarkdown from "@/components/ui/TypewriterMarkdown";
 import { STATUS_MAP } from "@/lib/constants";
-import { editorApi, type EditorManuscriptItem } from "@/services/api";
+import { editorApi, type EditorManuscriptDetail, type EditorManuscriptItem } from "@/services/api";
 
 const { TextArea } = Input;
 
@@ -36,7 +36,7 @@ export default function EditorWorkbenchPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [keyword, setKeyword] = useState<string>("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
+  const [detail, setDetail] = useState<EditorManuscriptDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [revisionComment, setRevisionComment] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
@@ -78,8 +78,8 @@ export default function EditorWorkbenchPage() {
     setLoadingDetail(true);
     try {
       const d = await editorApi.manuscriptDetail(id);
-      setDetail(d as Record<string, unknown>);
-      const report = (d as any).report;
+      setDetail(d);
+      const report = d.report;
       setAiReport(report ? { content: String(report.content ?? ""), model: String(report.model ?? "") } : null);
       setAiError(null);
     } catch (e) {
@@ -163,7 +163,10 @@ export default function EditorWorkbenchPage() {
   const manuscript = detail?.manuscript as Record<string, unknown> | undefined;
   const currentVersion = detail?.current_version as Record<string, unknown> | undefined;
   const parsed = detail?.parsed as Record<string, unknown> | undefined;
-  const editorActions = (detail?.editor_actions as Record<string, unknown>[]) || [];
+  const editorActions = useMemo(
+    () => detail?.editor_actions ?? [],
+    [detail?.editor_actions]
+  );
   const status = manuscript?.status as string | undefined;
 
   const timelineItems = useMemo(

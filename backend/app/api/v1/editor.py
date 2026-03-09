@@ -194,6 +194,29 @@ def editor_manuscript_detail(
     }
 
 
+@router.get("/manuscripts/{id}/text-for-ai-detect")
+def editor_manuscript_text_for_ai_detect(
+    id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(RequireEditor)],
+):
+    """返回当前稿件正文文本，供编辑端跳转 AI 检测页时自动导入。"""
+    m = db.query(Manuscript).filter(Manuscript.id == id).first()
+    if not m:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
+    if not m.current_version_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该稿件暂无版本或未解析")
+
+    parsed = db.query(ManuscriptParsed).filter(ManuscriptParsed.version_id == m.current_version_id).first()
+    if not parsed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="该版本尚未解析出正文，请稍后再试")
+
+    text = (parsed.body_text or "").strip()
+    if not text and parsed.abstract:
+        text = (parsed.abstract or "").strip()
+    return {"text": text or ""}
+
+
 VALID_ACTION_TYPES = {"revision_request", "reject", "accept", "status_change"}
 
 

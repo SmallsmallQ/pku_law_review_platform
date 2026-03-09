@@ -21,16 +21,15 @@ import {
 import type { BreadcrumbItemType } from "antd/es/breadcrumb/Breadcrumb";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
-import MarkdownRenderer from "@/components/ui/MarkdownRenderer";
 import TypewriterMarkdown from "@/components/ui/TypewriterMarkdown";
 import { STATUS_MAP } from "@/lib/constants";
-import { editorApi } from "@/services/api";
+import { editorApi, type EditorManuscriptDetail } from "@/services/api";
 
 export default function EditorManuscriptDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const router = useRouter();
-  const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
+  const [detail, setDetail] = useState<EditorManuscriptDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -74,12 +73,9 @@ export default function EditorManuscriptDetailPage() {
     setLoadError(null);
     try {
       const d = await editorApi.manuscriptDetail(Number(id));
-      setDetail(d as Record<string, unknown>);
-      if ((d as any).report) {
-        setAiReport((d as any).report);
-      } else {
-        setAiReport(null);
-      }
+      const report = d.report;
+      setDetail(d);
+      setAiReport(report ? { content: String(report.content ?? ""), model: String(report.model ?? "") } : null);
       setReportJustGenerated(false);
     } catch (e) {
       setDetail(null);
@@ -183,6 +179,11 @@ export default function EditorManuscriptDetailPage() {
       setActionLoading(false);
     }
   };
+
+  const jumpToAiDetect = useCallback(() => {
+    if (!id) return;
+    router.push(`/ai-detect?source=editor&manuscriptId=${id}`);
+  }, [id, router]);
 
   useEffect(() => {
     if (!successMessage) return;
@@ -321,13 +322,13 @@ export default function EditorManuscriptDetailPage() {
   if (!user || user.role === "author") return null;
 
   const breadcrumbItems: BreadcrumbItemType[] = [
-    { title: <Link href="/">首页</Link> },
-    { title: <Link href="/editor">编辑工作台</Link> },
-    { title: detail && manuscript ? breadcrumbTitle : "稿件详情" },
+    { title: "首页", href: "/" },
+    { title: "编辑工作台", href: "/editor" },
+    { title: detail != null && manuscript != null ? breadcrumbTitle : "稿件详情" },
   ];
 
-  const pageContent = (
-    <section className="bg-[#f5f6f8]">
+  return (
+    <div className="bg-[#f5f6f8]">
       <HeaderBar />
       <main className="w-full px-5 py-8 sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
         <Card>
@@ -353,7 +354,7 @@ export default function EditorManuscriptDetailPage() {
           {!loading && detail && manuscript && (
             <>
               {/* 主布局：左侧信息与操作区，右侧稿件预览区 */}
-              <div className="grid grid-cols-1 xl:grid-cols-[380px_1fr] gap-6 xl:gap-8">
+              <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[380px_1fr] xl:gap-8">
                 {/* 左侧：元数据 + 操作 + 引注 + AI 报告 + 操作记录 */}
                 <div className="flex flex-col gap-4 order-2 xl:order-1">
                   <Card size="small" className="shadow-sm">
@@ -391,6 +392,9 @@ export default function EditorManuscriptDetailPage() {
                     <Space wrap size="small">
                       <Button type="primary" ghost size="small" onClick={runAiReview} loading={aiReviewLoading}>
                         生成 AI 初审报告
+                      </Button>
+                      <Button type="default" size="small" onClick={jumpToAiDetect}>
+                        一键跳转 AI 率审核
                       </Button>
                       <Button type="default" size="small" onClick={() => setAiAssistantOpen(true)}>AI 助手</Button>
                       {status !== "revision_requested" && status !== "rejected" && status !== "accepted" && (
@@ -468,11 +472,11 @@ export default function EditorManuscriptDetailPage() {
                 </div>
 
                 {/* 右侧：稿件预览（主视觉区域） */}
-                <div className="order-1 xl:order-2 min-h-[560px]">
+                <div className="order-1 self-start xl:order-2">
                   <Card
                     size="small"
                     title="原始稿件"
-                    className="h-full shadow-sm"
+                    className="shadow-sm"
                     extra={
                       currentVersion ? (
                         <a href={editorApi.downloadUrl(Number(id), Number(currentVersion.id))} target="_blank" rel="noopener noreferrer" className="text-xs">
@@ -538,7 +542,7 @@ export default function EditorManuscriptDetailPage() {
                               <Typography.Text type="secondary">.doc 格式可尝试「转为 PDF 预览」（需服务器安装 LibreOffice），或下载原稿查看。</Typography.Text>
                             )}
                           </div>
-                        ) : null}
+                        )}
                       </div>
                     )}
                   </Card>
@@ -648,8 +652,6 @@ export default function EditorManuscriptDetailPage() {
       >
         <p>确定要退稿吗？此操作将把稿件状态设为「退稿」。</p>
       </Modal>
-    </section>
+    </div>
   );
-
-  return pageContent;
 }

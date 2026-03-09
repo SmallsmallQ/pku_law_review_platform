@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button, Card, Input, message, Select, Spin, Typography, Upload } from "antd";
 import { CopyOutlined, FileWordOutlined, LinkOutlined } from "@ant-design/icons";
 import HeaderBar from "@/components/HeaderBar";
 import { useAuth } from "@/contexts/AuthContext";
-import { manuscriptsApi, type ManuscriptListItem } from "@/services/api";
+import { editorApi, manuscriptsApi, type ManuscriptListItem } from "@/services/api";
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -14,12 +15,18 @@ const ZHUQUE_URL = "https://matrix.tencent.com/ai-detect/";
 
 export default function AIDetectPage() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [content, setContent] = useState("");
   const [manuscriptList, setManuscriptList] = useState<ManuscriptListItem[]>([]);
   const [loadingList, setLoadingList] = useState(false);
   const [loadingImport, setLoadingImport] = useState(false);
   const [loadingExtract, setLoadingExtract] = useState(false);
   const [selectedManuscriptId, setSelectedManuscriptId] = useState<number | null>(null);
+  const [autoImportedKey, setAutoImportedKey] = useState<string | null>(null);
+
+  const source = searchParams.get("source");
+  const sourceManuscriptId = Number(searchParams.get("manuscriptId") || "");
+  const hasSourceManuscriptId = Number.isInteger(sourceManuscriptId) && sourceManuscriptId > 0;
 
   useEffect(() => {
     if (!user) return;
@@ -31,23 +38,44 @@ export default function AIDetectPage() {
       .finally(() => setLoadingList(false));
   }, [user]);
 
-  const handleImportFromManuscript = async () => {
-    const manuscriptId = selectedManuscriptId;
-    if (!manuscriptId) {
-      message.warning("请先选择稿件");
-      return;
-    }
+  const importManuscriptText = useCallback(async (manuscriptId: number, sourceType: "author" | "editor") => {
     setLoadingImport(true);
     try {
-      const { text } = await manuscriptsApi.getTextForAiDetect(manuscriptId);
+      const { text } = sourceType === "editor"
+        ? await editorApi.getTextForAiDetect(manuscriptId)
+        : await manuscriptsApi.getTextForAiDetect(manuscriptId);
+      if (sourceType === "author") {
+        setSelectedManuscriptId(manuscriptId);
+      }
       setContent(text || "");
-      message.success(text ? "已导入正文" : "该稿件暂无解析正文");
+      message.success(text ? (sourceType === "editor" ? "已导入当前稿件正文，可直接检测" : "已导入正文") : "该稿件暂无解析正文");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "导入失败";
       message.error(msg);
     } finally {
       setLoadingImport(false);
     }
+  }, []);
+
+  useEffect(() => {
+    if (!user || !hasSourceManuscriptId) return;
+
+    const sourceType = source === "editor" ? "editor" : "author";
+    const importKey = `${sourceType}:${sourceManuscriptId}`;
+    if (autoImportedKey === importKey) return;
+    if (sourceType === "editor" && user.role !== "editor" && user.role !== "admin") return;
+
+    setAutoImportedKey(importKey);
+    void importManuscriptText(sourceManuscriptId, sourceType);
+  }, [autoImportedKey, hasSourceManuscriptId, importManuscriptText, source, sourceManuscriptId, user]);
+
+  const handleImportFromManuscript = async () => {
+    const manuscriptId = selectedManuscriptId;
+    if (!manuscriptId) {
+      message.warning("请先选择稿件");
+      return;
+    }
+    await importManuscriptText(manuscriptId, "author");
   };
 
   const handleUploadFile = async (file: File) => {

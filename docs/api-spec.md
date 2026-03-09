@@ -83,6 +83,7 @@
 | GET | /admin/users | 用户列表 | query: role?, is_active?, page, page_size。仅 admin。 |
 | POST | /admin/users | 创建用户（如编辑账号） | body: email, password, real_name, role。 |
 | PUT | /admin/users/{id} | 更新用户 | 可改 real_name, role, is_active 等。 |
+| DELETE | /admin/users/{id} | 删除用户 | 禁止删除当前登录账号、最后一个管理员、已有投稿或编辑记录的用户。 |
 | GET | /admin/sections | 栏目列表 | 增删改可用 REST：GET/POST/PUT/DELETE /admin/sections[/{id}]。 |
 | GET | /admin/templates/revision | 退修意见模板列表 | |
 | POST | /admin/templates/revision | 新增退修模板 | body: name, content。 |

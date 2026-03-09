@@ -191,12 +191,33 @@ export interface EditorManuscriptItem {
   has_report: boolean;
 }
 
+export interface EditorManuscriptDetail {
+  manuscript?: Record<string, unknown>;
+  current_version?: Record<string, unknown>;
+  parsed?: Record<string, unknown>;
+  editor_actions?: Record<string, unknown>[];
+  citation_issues?: Array<{
+    location: string;
+    issue_type?: string;
+    description: string;
+    suggestion?: string;
+    severity?: string;
+  }>;
+  report?: {
+    content?: string;
+    model?: string;
+  } | null;
+}
+
 export const editorApi = {
   manuscripts: (params?: { page?: number; page_size?: number; status?: string; keyword?: string }) =>
     request<{ items: EditorManuscriptItem[]; total: number }>("editor/manuscripts", {
       params: params ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) : undefined,
     }),
-  manuscriptDetail: (id: number) => request<Record<string, unknown>>(`editor/manuscripts/${id}`),
+  manuscriptDetail: (id: number) => request<EditorManuscriptDetail>(`editor/manuscripts/${id}`),
+  /** 获取稿件正文文本，用于编辑端跳转 AI 检测时自动导入 */
+  getTextForAiDetect: (id: number) =>
+    request<{ text: string }>(`editor/manuscripts/${id}/text-for-ai-detect`),
   action: (id: number, body: { action_type: string; to_status?: string; comment?: string }) =>
     request<{ message: string; new_status: string }>(`editor/manuscripts/${id}/actions`, {
       method: "POST",
@@ -324,6 +345,8 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
+  deleteUser: (id: number) =>
+    request<void>(`admin/users/${id}`, { method: "DELETE" }),
 
   sections: () => request<{ items: SectionItem[]; total: number }>("admin/sections"),
   createSection: (body: { name: string; code?: string; sort_order?: number }) =>

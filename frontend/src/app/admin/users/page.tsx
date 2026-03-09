@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Form, Input, Modal, Select, Space, Table, Tag, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { adminApi, type AdminUserItem } from "@/services/api";
@@ -22,8 +22,9 @@ export default function AdminUsersPage() {
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     adminApi
       .users({
@@ -39,9 +40,11 @@ export default function AdminUsersPage() {
       })
       .catch(() => setList([]))
       .finally(() => setLoading(false));
-  };
+  }, [page, roleFilter, activeFilter, keyword]);
 
-  useEffect(() => load(), [page, roleFilter, activeFilter, keyword]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleCreate = (values: { email: string; password: string; real_name?: string; role: string }) => {
     setSubmitting(true);
@@ -77,6 +80,23 @@ export default function AdminUsersPage() {
       .finally(() => setSubmitting(false));
   };
 
+  const handleDelete = (user: AdminUserItem) => {
+    if (!window.confirm(`确定删除用户 ${user.email} 吗？该操作不可恢复。`)) return;
+    setDeletingUserId(user.id);
+    adminApi
+      .deleteUser(user.id)
+      .then(() => {
+        message.success("删除成功");
+        if (list.length === 1 && page > 1) {
+          setPage(page - 1);
+          return;
+        }
+        load();
+      })
+      .catch((e) => message.error(e?.message || "删除失败"))
+      .finally(() => setDeletingUserId(null));
+  };
+
   const columns: ColumnsType<AdminUserItem> = [
     { title: "ID", dataIndex: "id", key: "id", width: 80 },
     { title: "邮箱", dataIndex: "email", key: "email" },
@@ -99,11 +119,16 @@ export default function AdminUsersPage() {
     {
       title: "操作",
       key: "action",
-      width: 80,
+      width: 140,
       render: (_, record) => (
-        <Button type="link" size="small" onClick={() => { setEditingUser(record); editForm.setFieldsValue({ real_name: record.real_name, role: record.role, is_active: record.is_active }); setEditModalOpen(true); }}>
-          编辑
-        </Button>
+        <Space size={0}>
+          <Button type="link" size="small" onClick={() => { setEditingUser(record); editForm.setFieldsValue({ real_name: record.real_name, role: record.role, is_active: record.is_active }); setEditModalOpen(true); }}>
+            编辑
+          </Button>
+          <Button type="link" size="small" danger loading={deletingUserId === record.id} onClick={() => handleDelete(record)}>
+            删除
+          </Button>
+        </Space>
       ),
     },
   ];
@@ -151,7 +176,14 @@ export default function AdminUsersPage() {
           <Form.Item name="email" label="邮箱" rules={[{ required: true }, { type: "email" }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="password" label="密码" rules={[{ required: true, min: 6 }]}>
+          <Form.Item
+            name="password"
+            label="密码"
+            rules={[
+              { required: true, min: 8, message: "至少 8 位" },
+              { pattern: /^(?=.*[A-Za-z])(?=.*\d).+$/, message: "需包含字母和数字" },
+            ]}
+          >
             <Input.Password />
           </Form.Item>
           <Form.Item name="real_name" label="姓名">
