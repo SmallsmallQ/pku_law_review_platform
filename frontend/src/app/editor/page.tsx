@@ -263,7 +263,7 @@ export default function EditorWorkbenchPage() {
             )}
           </Card>
 
-          <Card size="small" title="审稿意见与操作">
+          <Card size="small" title="审稿意见与操作" className="h-full [&_.ant-card-body]:h-full">
             {!selectedId ? (
               <Empty description="请先在左侧选择稿件" />
             ) : loadingDetail ? (
@@ -271,7 +271,7 @@ export default function EditorWorkbenchPage() {
                 <Spin />
               </div>
             ) : (
-              <Space direction="vertical" className="w-full" size="middle">
+              <div className="flex h-full flex-col gap-4">
                 <div className="rounded border border-[#ececec] p-3">
                   <div className="text-sm text-[#666] mb-1">当前稿件</div>
                   <div className="font-medium text-[#333]">{String(manuscript?.title ?? "—")}</div>
@@ -302,7 +302,7 @@ export default function EditorWorkbenchPage() {
                       )}
                     </div>
                     <TextArea
-                      rows={7}
+                      rows={6}
                       value={revisionComment}
                       onChange={(e) => setRevisionComment(e.target.value)}
                       placeholder="在此填写退修意见（点击“提交退修”时发送给作者）"
@@ -349,16 +349,16 @@ export default function EditorWorkbenchPage() {
 
                 {aiError ? <Alert type="error" showIcon message={aiError} /> : null}
                 {aiReport ? (
-                  <div className="rounded border border-[#ececec] p-3 overflow-hidden">
+                  <div className="flex min-h-0 flex-1 flex-col rounded border border-[#ececec] p-3 overflow-hidden">
                     <div className="mb-2 text-sm font-medium text-[#333]">
                       AI 初审报告{aiReport.model ? `（${aiReport.model}）` : ""}
                     </div>
-                    <div className="min-h-[180px] max-h-[52vh] overflow-y-auto pr-1">
+                    <div className="min-h-[260px] flex-1 overflow-y-auto pr-1">
                       <TypewriterMarkdown content={aiReport.content} enabled={typewriterForReportId === selectedId} />
                     </div>
                   </div>
                 ) : null}
-              </Space>
+              </div>
             )}
           </Card>
 
