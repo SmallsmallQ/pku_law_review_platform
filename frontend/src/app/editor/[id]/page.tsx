@@ -326,8 +326,8 @@ export default function EditorManuscriptDetailPage() {
     { title: detail && manuscript ? breadcrumbTitle : "稿件详情" },
   ];
 
-  return (
-    <div className="bg-[#f5f6f8]">
+  const pageContent = (
+    <section className="bg-[#f5f6f8]">
       <HeaderBar />
       <main className="w-full px-5 py-8 sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
         <Card>
@@ -648,6 +648,8 @@ export default function EditorManuscriptDetailPage() {
       >
         <p>确定要退稿吗？此操作将把稿件状态设为「退稿」。</p>
       </Modal>
-    </div>
+    </section>
   );
+
+  return pageContent;
 }
