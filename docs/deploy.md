@@ -4,6 +4,19 @@
 
 ---
 
+## 本站部署：review.smallsmallq.com
+
+以下配置均按 **review.smallsmallq.com** 编写，可直接复制使用。
+
+| 项目 | 值 |
+|------|-----|
+| 访问地址 | https://review.smallsmallq.com |
+| 后端 CORS | `["https://review.smallsmallq.com"]` |
+| Nginx `server_name` | `review.smallsmallq.com` |
+| certbot 域名 | `review.smallsmallq.com` |
+
+---
+
 ## 一、服务器与环境要求
 
 | 项目 | 要求 |
@@ -79,11 +92,17 @@ nano .env
 
 **生产环境必须修改的项：**
 
-| 变量 | 说明 | 示例 |
-|------|------|------|
-| `SECRET_KEY` | JWT 密钥，务必改为随机长字符串 | 用 `openssl rand -hex 32` 生成 |
-| `CORS_ORIGINS` | 允许的前端来源（含协议与域名） | `["https://你的域名"]` 或 `["https://law.example.com"]` |
+| 变量 | 说明 | 本站示例（review.smallsmallq.com） |
+|------|------|-----------------------------------|
+| `SECRET_KEY` | JWT 密钥，务必改为随机长字符串 | `openssl rand -hex 32` 生成后填入 |
+| `CORS_ORIGINS` | 允许的前端来源（含协议与域名） | `["https://review.smallsmallq.com"]` |
 | `DEBUG` | 生产设为 `false` | `false` |
+
+本站可直接在 `.env` 中写：
+
+```env
+CORS_ORIGINS=["https://review.smallsmallq.com"]
+```
 
 **可选：**
 
@@ -107,13 +126,7 @@ python -m scripts.init_db
 
 若 **前端与后端同机、且由 Nginx 统一入口**（推荐），则浏览器请求 `/api/v1` 会由 Nginx 转发到后端，**无需**再设 `NEXT_PUBLIC_API_URL`。
 
-若 **前端直连后端**（例如后端在 `https://api.你的域名.com`），则需在构建前设置：
-
-```bash
-cd /opt/pku_law_review_platform/frontend
-echo "NEXT_PUBLIC_API_URL=https://api.你的域名.com/api/v1" > .env.production
-npm run build
-```
+若 **前端直连后端**（例如后端在 `https://api.review.smallsmallq.com`），则需在构建前设置。本站采用同机 Nginx 统一入口，一般**无需**设置。
 
 ---
 
@@ -213,7 +226,7 @@ sudo systemctl status law-review-api law-review-web
 ```nginx
 server {
     listen 80;
-    server_name 你的域名;   # 如 law.example.com
+    server_name review.smallsmallq.com;
 
     # 后端 API
     location /api/v1/ {
@@ -249,7 +262,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-**后端 .env 中的 `CORS_ORIGINS`** 需包含该站点的完整来源，例如：`["https://你的域名"]` 或 `["http://你的域名"]`（未上 HTTPS 时）。
+**后端 .env 中的 `CORS_ORIGINS`** 本站应设为：`["https://review.smallsmallq.com"]`（上 HTTPS 后）；未上 HTTPS 前可先用 `["http://review.smallsmallq.com"]`。
 
 ---
 
@@ -259,17 +272,17 @@ sudo systemctl reload nginx
 
 ```bash
 sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d 你的域名
+sudo certbot --nginx -d review.smallsmallq.com
 ```
 
-按提示选择为上述 Nginx server 申请证书并自动配置 HTTPS。之后后端 `CORS_ORIGINS` 改为 `["https://你的域名"]`，并重启后端服务。
+按提示选择为上述 Nginx server 申请证书并自动配置 HTTPS。完成后确认后端 `.env` 中 `CORS_ORIGINS=["https://review.smallsmallq.com"]`，并执行 `sudo systemctl restart law-review-api`。
 
 ---
 
 ## 十、部署检查清单
 
 - [ ] 后端 `SECRET_KEY` 已改为随机字符串
-- [ ] 后端 `CORS_ORIGINS` 包含实际访问的前端地址（含协议）
+- [ ] 后端 `CORS_ORIGINS` 为 `["https://review.smallsmallq.com"]`（或未上 HTTPS 时 `["http://review.smallsmallq.com"]`）
 - [ ] 后端 `DEBUG=false`
 - [ ] 数据库已执行 `python -m scripts.init_db`
 - [ ] 存储目录存在且进程有写权限（使用 `STORAGE_LOCAL_PATH` 时）

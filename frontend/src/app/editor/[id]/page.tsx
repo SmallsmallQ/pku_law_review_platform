@@ -203,6 +203,16 @@ export default function EditorManuscriptDetailPage() {
     };
   }, []);
 
+  const manuscript = detail?.manuscript as Record<string, unknown> | undefined;
+  const currentVersion = detail?.current_version as Record<string, unknown> | undefined;
+  const parsed = detail?.parsed as Record<string, unknown> | undefined;
+  const editorActions = (detail?.editor_actions as Record<string, unknown>[]) || [];
+  const citationIssues = (detail?.citation_issues as Array<{ location: string; description: string; suggestion?: string }>) || [];
+  const status = manuscript?.status as string | undefined;
+  const manuscriptNo = manuscript?.manuscript_no as string | undefined;
+  const title = manuscript?.title as string | undefined;
+  const breadcrumbTitle = manuscriptNo || (title ? `${String(title).slice(0, 20)}${String(title).length > 20 ? "…" : ""}` : "稿件详情");
+
   /** 请求后端将当前版本 Word 转为 PDF 并返回，用于预览 */
   const loadPdfPreview = useCallback(async () => {
     if (!id || !currentVersion) return;
@@ -231,16 +241,6 @@ export default function EditorManuscriptDetailPage() {
       setPdfPreviewLoading(false);
     }
   }, [id, currentVersion]);
-
-  const manuscript = detail?.manuscript as Record<string, unknown> | undefined;
-  const currentVersion = detail?.current_version as Record<string, unknown> | undefined;
-  const parsed = detail?.parsed as Record<string, unknown> | undefined;
-  const editorActions = (detail?.editor_actions as Record<string, unknown>[]) || [];
-  const citationIssues = (detail?.citation_issues as { location: string; description: string; suggestion?: string }[]) || [];
-  const status = manuscript?.status as string | undefined;
-  const manuscriptNo = manuscript?.manuscript_no as string | undefined;
-  const title = manuscript?.title as string | undefined;
-  const breadcrumbTitle = manuscriptNo || (title ? `${String(title).slice(0, 20)}${String(title).length > 20 ? "…" : ""}` : "稿件详情");
 
   useEffect(() => {
     const versionId = Number(currentVersion?.id);
