@@ -17,6 +17,7 @@ const eslintConfig = [
   {
     rules: {
       "react-hooks/set-state-in-effect": "off",
+      "@next/next/no-page-custom-font": "off",
     },
   },
 ];

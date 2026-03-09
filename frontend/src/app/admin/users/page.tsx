@@ -4,8 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Form, Input, Modal, Select, Space, Table, Tag, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { adminApi, type AdminUserItem } from "@/services/api";
-
-const ROLE_MAP: Record<string, string> = { author: "作者", editor: "编辑", admin: "管理员" };
+import { ROLE_MAP } from "@/lib/constants";
 const pageSize = 20;
 
 export default function AdminUsersPage() {
@@ -106,7 +105,7 @@ export default function AdminUsersPage() {
       dataIndex: "role",
       key: "role",
       width: 90,
-      render: (r: string) => <Tag color={r === "admin" ? "red" : r === "editor" ? "blue" : "default"}>{ROLE_MAP[r] ?? r}</Tag>,
+      render: (r: string) => <Tag color={r === "admin" ? "red" : r === "editor" ? "blue" : r.includes("reviewer") ? "purple" : "default"}>{ROLE_MAP[r] ?? r}</Tag>,
     },
     {
       title: "状态",
@@ -150,6 +149,8 @@ export default function AdminUsersPage() {
           />
           <Select placeholder="角色" allowClear value={roleFilter || undefined} onChange={(v) => { setPage(1); setRoleFilter(v ?? ""); }} style={{ width: 100 }}>
             <Select.Option value="author">作者</Select.Option>
+            <Select.Option value="internal_reviewer">内审</Select.Option>
+            <Select.Option value="external_reviewer">外审</Select.Option>
             <Select.Option value="editor">编辑</Select.Option>
             <Select.Option value="admin">管理员</Select.Option>
           </Select>
@@ -192,6 +193,8 @@ export default function AdminUsersPage() {
           <Form.Item name="role" label="角色" initialValue="author" rules={[{ required: true }]}>
             <Select>
               <Select.Option value="author">作者</Select.Option>
+              <Select.Option value="internal_reviewer">内审</Select.Option>
+              <Select.Option value="external_reviewer">外审</Select.Option>
               <Select.Option value="editor">编辑</Select.Option>
               <Select.Option value="admin">管理员</Select.Option>
             </Select>
@@ -213,6 +216,8 @@ export default function AdminUsersPage() {
           <Form.Item name="role" label="角色" rules={[{ required: true }]}>
             <Select>
               <Select.Option value="author">作者</Select.Option>
+              <Select.Option value="internal_reviewer">内审</Select.Option>
+              <Select.Option value="external_reviewer">外审</Select.Option>
               <Select.Option value="editor">编辑</Select.Option>
               <Select.Option value="admin">管理员</Select.Option>
             </Select>

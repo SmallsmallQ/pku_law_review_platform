@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button, Drawer, Layout, Menu, Space } from "antd";
 import { useAuth } from "@/contexts/AuthContext";
+import { REVIEW_STAFF_ROLES, ROLE_MAP } from "@/lib/constants";
 
 const { Header } = Layout;
 
@@ -37,6 +38,7 @@ export default function HeaderBar() {
   const selectedKey = getSelectedKey(pathname);
   const navItems = getNavItems(user?.role === "admin");
   const isHomePage = pathname === "/";
+  const isReviewStaff = !!user?.role && REVIEW_STAFF_ROLES.includes(user.role as (typeof REVIEW_STAFF_ROLES)[number]);
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -109,7 +111,7 @@ export default function HeaderBar() {
             {!loading && user && (
               <span className={isHomePage ? "max-w-[180px] truncate text-[#666]" : "max-w-[180px] truncate text-white/85"}>
                 {user.real_name || user.email}
-                {user.role !== "author" && ` · ${user.role === "editor" ? "编辑" : "管理员"}`}
+                {isReviewStaff && ` · ${ROLE_MAP[user.role] ?? user.role}`}
               </span>
             )}
             {user ? (
@@ -167,7 +169,7 @@ export default function HeaderBar() {
             {!loading && user && (
               <div className="text-[#666]">
                 {user.real_name || user.email}
-                {user.role !== "author" && ` · ${user.role === "editor" ? "编辑" : "管理员"}`}
+                {isReviewStaff && ` · ${ROLE_MAP[user.role] ?? user.role}`}
               </div>
             )}
             {user ? (

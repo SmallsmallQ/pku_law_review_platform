@@ -185,10 +185,25 @@ export interface EditorManuscriptItem {
   manuscript_no: string;
   title: string;
   status: string;
+  current_review_stage?: string | null;
   submitted_by: number;
   created_at: string;
   current_version_id: number | null;
   has_report: boolean;
+  assignments?: ManuscriptAssignmentItem[];
+  available_actions?: string[];
+}
+
+export interface ManuscriptAssignmentItem {
+  id: number;
+  review_stage: string;
+  reviewer_id: number;
+  reviewer_name: string;
+  reviewer_email?: string | null;
+  reviewer_role?: string | null;
+  note?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 export interface EditorManuscriptDetail {
@@ -196,6 +211,8 @@ export interface EditorManuscriptDetail {
   current_version?: Record<string, unknown>;
   parsed?: Record<string, unknown>;
   editor_actions?: Record<string, unknown>[];
+  assignments?: ManuscriptAssignmentItem[];
+  available_actions?: string[];
   citation_issues?: Array<{
     location: string;
     issue_type?: string;
@@ -219,7 +236,7 @@ export const editorApi = {
   getTextForAiDetect: (id: number) =>
     request<{ text: string }>(`editor/manuscripts/${id}/text-for-ai-detect`),
   action: (id: number, body: { action_type: string; to_status?: string; comment?: string }) =>
-    request<{ message: string; new_status: string }>(`editor/manuscripts/${id}/actions`, {
+    request<{ message: string; new_status: string; current_review_stage?: string | null }>(`editor/manuscripts/${id}/actions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -299,6 +316,7 @@ export interface AdminManuscriptItem {
   manuscript_no: string;
   title: string;
   status: string;
+  current_review_stage: string | null;
   submitted_by: number;
   submitted_by_email: string | null;
   section_id: number | null;
@@ -306,6 +324,7 @@ export interface AdminManuscriptItem {
   current_version_id: number | null;
   created_at: string;
   updated_at: string | null;
+  assignments: ManuscriptAssignmentItem[];
 }
 
 export interface AdminStats {
@@ -317,14 +336,35 @@ export interface AdminStats {
   templates_count: number;
 }
 
+export interface AdminRecentActionItem {
+  id: number;
+  manuscript_id: number;
+  manuscript_no: string | null;
+  manuscript_title: string | null;
+  action_type: string;
+  from_status: string | null;
+  to_status: string | null;
+  comment: string | null;
+  editor_id: number;
+  editor_email: string | null;
+  editor_name: string | null;
+  created_at: string;
+}
+
 export const adminApi = {
   manuscripts: (params?: { status?: string; section_id?: number; keyword?: string; page?: number; page_size?: number }) =>
     request<{ items: AdminManuscriptItem[]; total: number }>("admin/manuscripts", {
       params: params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])) : undefined,
     }),
   manuscriptAction: (id: number, body: { action_type: string; to_status?: string; comment?: string }) =>
-    request<{ message: string; new_status: string }>(`admin/manuscripts/${id}/actions`, {
+    request<{ message: string; new_status: string; current_review_stage?: string | null }>(`admin/manuscripts/${id}/actions`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  assignManuscript: (id: number, body: { review_stage: string; reviewer_id: number; note?: string; activate_stage?: boolean }) =>
+    request<{ message: string; status: string; current_review_stage?: string | null; assignments: ManuscriptAssignmentItem[] }>(`admin/manuscripts/${id}/assignments`, {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
@@ -332,6 +372,10 @@ export const adminApi = {
   users: (params?: { role?: string; is_active?: boolean; keyword?: string; page?: number; page_size?: number }) =>
     request<{ items: AdminUserItem[]; total: number }>("admin/users", {
       params: params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])) : undefined,
+    }),
+  recentUsers: (params?: { limit?: number }) =>
+    request<{ items: AdminUserItem[]; total: number }>("admin/users/recent", {
+      params: params ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) : undefined,
     }),
   createUser: (body: { email: string; password: string; real_name?: string; role?: string }) =>
     request<AdminUserItem>("admin/users", {
@@ -389,4 +433,8 @@ export const adminApi = {
     }),
 
   stats: () => request<AdminStats>("admin/stats"),
+  recentActions: (params?: { limit?: number }) =>
+    request<{ items: AdminRecentActionItem[]; total: number }>("admin/actions/recent", {
+      params: params ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) : undefined,
+    }),
 };

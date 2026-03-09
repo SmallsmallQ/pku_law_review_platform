@@ -15,6 +15,7 @@ class Manuscript(Base):
     submitted_by = Column(IDType, ForeignKey("users.id"), nullable=False, index=True)
     section_id = Column(Integer, ForeignKey("sections.id"))
     status = Column(String(30), nullable=False, index=True)
+    current_review_stage = Column(String(20), index=True)
     current_version_id = Column(IDType, ForeignKey("manuscript_versions.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

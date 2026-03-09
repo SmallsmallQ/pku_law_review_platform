@@ -22,13 +22,14 @@ import type { BreadcrumbItemType } from "antd/es/breadcrumb/Breadcrumb";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
 import TypewriterMarkdown from "@/components/ui/TypewriterMarkdown";
-import { STATUS_MAP } from "@/lib/constants";
+import { REVIEW_STAGE_MAP, REVIEW_STAFF_ROLES, ROLE_MAP, STATUS_MAP } from "@/lib/constants";
 import { editorApi, type EditorManuscriptDetail } from "@/services/api";
 
 export default function EditorManuscriptDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const router = useRouter();
+  const isReviewStaff = !!user?.role && REVIEW_STAFF_ROLES.includes(user.role as (typeof REVIEW_STAFF_ROLES)[number]);
   const [detail, setDetail] = useState<EditorManuscriptDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -86,12 +87,12 @@ export default function EditorManuscriptDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    if (!user || user.role === "author") {
+    if (!user || !isReviewStaff) {
       router.push("/");
       return;
     }
     load();
-  }, [user, id, router, load]);
+  }, [user, id, router, load, isReviewStaff]);
 
   const runAiReview = async () => {
     if (!id) return;
@@ -208,8 +209,11 @@ export default function EditorManuscriptDetailPage() {
   const currentVersion = detail?.current_version as Record<string, unknown> | undefined;
   const parsed = detail?.parsed as Record<string, unknown> | undefined;
   const editorActions = (detail?.editor_actions as Record<string, unknown>[]) || [];
+  const assignments = (detail?.assignments as Array<Record<string, unknown>>) || [];
+  const availableActions = (detail?.available_actions as string[]) || [];
   const citationIssues = (detail?.citation_issues as Array<{ location: string; description: string; suggestion?: string }>) || [];
   const status = manuscript?.status as string | undefined;
+  const currentStage = manuscript?.current_review_stage as string | undefined;
   const manuscriptNo = manuscript?.manuscript_no as string | undefined;
   const title = manuscript?.title as string | undefined;
   const breadcrumbTitle = manuscriptNo || (title ? `${String(title).slice(0, 20)}${String(title).length > 20 ? "…" : ""}` : "稿件详情");
@@ -319,7 +323,7 @@ export default function EditorManuscriptDetailPage() {
     };
   }, [currentVersion, id]);
 
-  if (!user || user.role === "author") return null;
+  if (!user || !isReviewStaff) return null;
 
   const breadcrumbItems: BreadcrumbItemType[] = [
     { title: "首页", href: "/" },
@@ -364,7 +368,13 @@ export default function EditorManuscriptDetailPage() {
                       <Descriptions.Item label="状态">
                         <Tag color="default">{STATUS_MAP[status ?? ""] ?? status}</Tag>
                       </Descriptions.Item>
+                      <Descriptions.Item label="当前阶段">
+                        {currentStage ? <Tag color="blue">{REVIEW_STAGE_MAP[currentStage] ?? currentStage}</Tag> : "—"}
+                      </Descriptions.Item>
                       <Descriptions.Item label="投稿人 ID">{String(manuscript.submitted_by)}</Descriptions.Item>
+                      <Descriptions.Item label="审稿分配">
+                        {assignments.length > 0 ? assignments.map((item) => `${REVIEW_STAGE_MAP[String(item.review_stage)] ?? String(item.review_stage)}: ${String(item.reviewer_name)}${item.reviewer_role ? `（${ROLE_MAP[String(item.reviewer_role)] ?? String(item.reviewer_role)}）` : ""}`).join("；") : "—"}
+                      </Descriptions.Item>
                       {currentVersion && (
                         <Descriptions.Item label="当前版本">
                           <Space>
@@ -397,13 +407,22 @@ export default function EditorManuscriptDetailPage() {
                         一键跳转 AI 率审核
                       </Button>
                       <Button type="default" size="small" onClick={() => setAiAssistantOpen(true)}>AI 助手</Button>
-                      {status !== "revision_requested" && status !== "rejected" && status !== "accepted" && (
+                      {availableActions.includes("revision_request") && (
                         <Button size="small" onClick={() => { setRevisionModalOpen(true); setRevisionDraftError(null); }}>退修</Button>
                       )}
-                      {status !== "rejected" && (
+                      {availableActions.includes("reject") && (
                         <Button danger size="small" onClick={() => setRejectConfirmOpen(true)} disabled={actionLoading}>退稿</Button>
                       )}
-                      {status !== "accepted" && (
+                      {availableActions.includes("submit_internal_review") && (
+                        <Button type="primary" size="small" onClick={() => runAction("submit_internal_review")} disabled={actionLoading}>提交内审</Button>
+                      )}
+                      {availableActions.includes("submit_external_review") && (
+                        <Button type="primary" size="small" onClick={() => runAction("submit_external_review")} disabled={actionLoading}>提交外审</Button>
+                      )}
+                      {availableActions.includes("submit_final_submission") && (
+                        <Button type="primary" size="small" onClick={() => runAction("submit_final_submission")} disabled={actionLoading}>提交成稿</Button>
+                      )}
+                      {availableActions.includes("accept") && (
                         <Button type="primary" size="small" onClick={() => runAction("accept")} disabled={actionLoading}>录用</Button>
                       )}
                     </Space>
@@ -459,7 +478,9 @@ export default function EditorManuscriptDetailPage() {
                         renderItem={(a) => (
                           <List.Item className="!px-0">
                             <span className="text-xs">{String(a.action_type)} → {String(a.to_status)}</span>
-                            <Typography.Text type="secondary" className="text-xs block">{String(a.created_at ?? "").slice(0, 16)}</Typography.Text>
+                            <Typography.Text type="secondary" className="text-xs block">
+                              {`${String(a.operator_name ?? "")} ${String(a.created_at ?? "").slice(0, 16)}`.trim()}
+                            </Typography.Text>
                           </List.Item>
                         )}
                       />

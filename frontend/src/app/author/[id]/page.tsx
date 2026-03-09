@@ -147,7 +147,7 @@ export default function AuthorManuscriptDetailPage() {
                   <List
                     size="small"
                     dataSource={revisions}
-                    renderItem={(r, i) => (
+                    renderItem={(r) => (
                       <List.Item>
                         <div>
                           {r.comment ? <MarkdownRenderer content={r.comment} /> : <p className="mb-0">—</p>}

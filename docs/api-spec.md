@@ -81,9 +81,11 @@
 | GET | /admin/manuscripts | 全站稿件列表 | query: status?, section_id?, keyword?, page, page_size。仅 admin。 |
 | POST | /admin/manuscripts/{id}/actions | 管理员稿件操作 | body: action_type（status_change / revision_request / reject / accept）, to_status?, comment?。 |
 | GET | /admin/users | 用户列表 | query: role?, is_active?, page, page_size。仅 admin。 |
+| GET | /admin/users/recent | 最近注册用户 | query: limit（默认 8）。用于仪表盘“最近注册用户”。 |
 | POST | /admin/users | 创建用户（如编辑账号） | body: email, password, real_name, role。 |
 | PUT | /admin/users/{id} | 更新用户 | 可改 real_name, role, is_active 等。 |
 | DELETE | /admin/users/{id} | 删除用户 | 禁止删除当前登录账号、最后一个管理员、已有投稿或编辑记录的用户。 |
+| GET | /admin/actions/recent | 最近处理记录 | query: limit（默认 10）。返回稿件操作、处理人、状态变化。 |
 | GET | /admin/sections | 栏目列表 | 增删改可用 REST：GET/POST/PUT/DELETE /admin/sections[/{id}]。 |
 | GET | /admin/templates/revision | 退修意见模板列表 | |
 | POST | /admin/templates/revision | 新增退修模板 | body: name, content。 |

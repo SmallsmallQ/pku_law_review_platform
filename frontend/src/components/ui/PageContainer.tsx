@@ -3,11 +3,9 @@
 export default function PageContainer({
   children,
   className = "",
-  maxWidth = "max-w-5xl",
 }: {
   children: React.ReactNode;
   className?: string;
-  maxWidth?: string;
 }) {
   return (
     <div className={`bg-[#f5f6f8] ${className}`}>

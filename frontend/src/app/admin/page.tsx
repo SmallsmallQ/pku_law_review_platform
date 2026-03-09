@@ -1,39 +1,62 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Col, Empty, Row, Spin, Statistic, Table, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { adminApi, type AdminManuscriptItem, type AdminStats } from "@/services/api";
+import {
+  adminApi,
+  type AdminManuscriptItem,
+  type AdminRecentActionItem,
+  type AdminStats,
+  type AdminUserItem,
+} from "@/services/api";
 import { STATUS_MAP } from "@/lib/constants";
 
 const PENDING_STATUSES = new Set(["submitted", "parsing", "under_review", "revision_requested", "revised_submitted"]);
+const ACTION_TYPE_MAP: Record<string, string> = {
+  revision_request: "退修",
+  reject: "退稿",
+  accept: "录用",
+  status_change: "改状态",
+};
+const ROLE_MAP: Record<string, string> = {
+  author: "作者",
+  editor: "编辑",
+  admin: "管理员",
+};
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [pendingList, setPendingList] = useState<AdminManuscriptItem[]>([]);
+  const [recentUsers, setRecentUsers] = useState<AdminUserItem[]>([]);
+  const [recentActions, setRecentActions] = useState<AdminRecentActionItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     Promise.allSettled([
       adminApi.stats(),
-      adminApi.manuscripts({ page: 1, page_size: 12 }),
+      adminApi.manuscripts({ page: 1, page_size: 16 }),
+      adminApi.recentUsers({ limit: 8 }),
+      adminApi.recentActions({ limit: 10 }),
     ])
-      .then(([statsRes, manuscriptsRes]) => {
+      .then(([statsRes, manuscriptsRes, usersRes, actionsRes]) => {
         setStats(statsRes.status === "fulfilled" ? statsRes.value : null);
         if (manuscriptsRes.status === "fulfilled") {
           setPendingList(manuscriptsRes.value.items.filter((m) => PENDING_STATUSES.has(m.status)).slice(0, 8));
         } else {
           setPendingList([]);
         }
+        setRecentUsers(usersRes.status === "fulfilled" ? usersRes.value.items : []);
+        setRecentActions(actionsRes.status === "fulfilled" ? actionsRes.value.items : []);
       })
       .finally(() => setLoading(false));
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const pendingColumns: ColumnsType<AdminManuscriptItem> = [
     { title: "编号", dataIndex: "manuscript_no", key: "manuscript_no", width: 130 },
@@ -76,6 +99,82 @@ export default function AdminDashboardPage() {
     },
   ];
 
+  const recentUsersColumns: ColumnsType<AdminUserItem> = [
+    { title: "邮箱", dataIndex: "email", key: "email", width: 250 },
+    {
+      title: "姓名",
+      dataIndex: "real_name",
+      key: "real_name",
+      width: 120,
+      render: (name: string | null) => name || "—",
+    },
+    {
+      title: "角色",
+      dataIndex: "role",
+      key: "role",
+      width: 110,
+      render: (role: string) => <Tag color={role === "admin" ? "red" : role === "editor" ? "blue" : "default"}>{ROLE_MAP[role] ?? role}</Tag>,
+    },
+    {
+      title: "状态",
+      dataIndex: "is_active",
+      key: "is_active",
+      width: 90,
+      render: (active: boolean) => (active ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>),
+    },
+    {
+      title: "创建时间",
+      dataIndex: "created_at",
+      key: "created_at",
+      width: 170,
+      render: (value: string) => value?.slice(0, 19) ?? "",
+    },
+  ];
+
+  const recentActionsColumns: ColumnsType<AdminRecentActionItem> = [
+    {
+      title: "时间",
+      dataIndex: "created_at",
+      key: "created_at",
+      width: 170,
+      render: (value: string) => value?.slice(0, 19) ?? "",
+    },
+    {
+      title: "稿件",
+      key: "manuscript",
+      render: (_, record) => (
+        <Link href={`/editor/${record.manuscript_id}`} className="text-[#8B1538] hover:underline">
+          {record.manuscript_no || `#${record.manuscript_id}`}
+        </Link>
+      ),
+    },
+    {
+      title: "操作",
+      dataIndex: "action_type",
+      key: "action_type",
+      width: 100,
+      render: (actionType: string) => <Tag>{ACTION_TYPE_MAP[actionType] ?? actionType}</Tag>,
+    },
+    {
+      title: "状态变化",
+      key: "status_change",
+      width: 220,
+      render: (_, record) => (
+        <span className="text-xs text-[#555]">
+          {(record.from_status ? STATUS_MAP[record.from_status] ?? record.from_status : "-")}
+          {" -> "}
+          {(record.to_status ? STATUS_MAP[record.to_status] ?? record.to_status : "-")}
+        </span>
+      ),
+    },
+    {
+      title: "处理人",
+      key: "editor",
+      width: 220,
+      render: (_, record) => record.editor_name || record.editor_email || `#${record.editor_id}`,
+    },
+  ];
+
   const quickEntries = [
     {
       key: "/admin/manuscripts",
@@ -107,6 +206,13 @@ export default function AdminDashboardPage() {
     },
   ];
 
+  const statusEntries = useMemo(() => {
+    if (!stats) return [];
+    return Object.entries(stats.manuscripts_by_status)
+      .filter(([, c]) => c > 0)
+      .sort((a, b) => b[1] - a[1]);
+  }, [stats]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -124,11 +230,12 @@ export default function AdminDashboardPage() {
     );
   }
 
-  const statusEntries = Object.entries(stats.manuscripts_by_status).filter(([, c]) => c > 0);
-
   return (
     <div>
-      <h1 className="text-xl font-bold text-[#333] mb-6">仪表盘</h1>
+      <div className="mb-6 flex items-center justify-between gap-2">
+        <h1 className="text-xl font-bold text-[#333]">仪表盘</h1>
+        <Button onClick={load}>刷新数据</Button>
+      </div>
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} md={8}>
           <Card size="small" className="shadow-sm">
@@ -161,17 +268,25 @@ export default function AdminDashboardPage() {
           </Card>
         </Col>
       </Row>
-      {statusEntries.length > 0 && (
-        <Card size="small" title="稿件状态分布" className="mt-6 shadow-sm">
-          <div className="flex flex-wrap gap-4">
+
+      <Card size="small" title="状态看板" className="mt-6 shadow-sm">
+        {statusEntries.length === 0 ? (
+          <Empty description="暂无稿件数据" />
+        ) : (
+          <div className="flex flex-wrap gap-3">
             {statusEntries.map(([status, count]) => (
-              <span key={status} className="rounded bg-[#f0f0f0] px-3 py-1 text-sm text-[#555]">
+              <Link
+                key={status}
+                href={`/admin/manuscripts?status=${encodeURIComponent(status)}`}
+                className="rounded border border-[#e6e6e6] bg-[#fafafa] px-3 py-2 text-sm text-[#444] hover:border-[#8B1538] hover:text-[#8B1538]"
+              >
                 {STATUS_MAP[status] ?? status}: {count}
-              </span>
+              </Link>
             ))}
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
+
       <Card size="small" title="快捷入口" className="mt-6 shadow-sm">
         <Row gutter={[12, 12]}>
           {quickEntries.map((item) => (
@@ -194,6 +309,7 @@ export default function AdminDashboardPage() {
           ))}
         </Row>
       </Card>
+
       <Card
         size="small"
         title="待处理稿件"
@@ -217,6 +333,59 @@ export default function AdminDashboardPage() {
           />
         )}
       </Card>
+
+      <Row gutter={[16, 16]} className="mt-2">
+        <Col xs={24} xl={12}>
+          <Card
+            size="small"
+            title="最近注册用户"
+            className="mt-4 shadow-sm"
+            extra={(
+              <Link href="/admin/users" className="text-[#8B1538] hover:underline">
+                进入用户管理
+              </Link>
+            )}
+          >
+            {recentUsers.length === 0 ? (
+              <Empty description="暂无用户数据" />
+            ) : (
+              <Table<AdminUserItem>
+                rowKey="id"
+                columns={recentUsersColumns}
+                dataSource={recentUsers}
+                pagination={false}
+                size="small"
+                scroll={{ x: "max-content" }}
+              />
+            )}
+          </Card>
+        </Col>
+        <Col xs={24} xl={12}>
+          <Card
+            size="small"
+            title="最近处理记录"
+            className="mt-4 shadow-sm"
+            extra={(
+              <Link href="/admin/manuscripts" className="text-[#8B1538] hover:underline">
+                进入稿件总览
+              </Link>
+            )}
+          >
+            {recentActions.length === 0 ? (
+              <Empty description="暂无处理记录" />
+            ) : (
+              <Table<AdminRecentActionItem>
+                rowKey="id"
+                columns={recentActionsColumns}
+                dataSource={recentActions}
+                pagination={false}
+                size="small"
+                scroll={{ x: "max-content" }}
+              />
+            )}
+          </Card>
+        </Col>
+      </Row>
     </div>
   );
 }

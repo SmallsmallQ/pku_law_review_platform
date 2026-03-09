@@ -13,11 +13,12 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.core.deps import RequireEditor, get_current_user, get_current_user_for_download
+from app.core.deps import RequireReviewStaff, get_current_user_for_download
+from app.core.review_workflow import REVIEW_STAGES, TERMINAL_STATUSES, next_flow_for_action, status_for_stage
 from app.core.storage import resolve_path
 from app.services.docx_to_pdf import convert_to_pdf
 from app.db.base import get_db
-from app.models import CitationIssue, EditorAction, Manuscript, ManuscriptVersion, User, ManuscriptParsed, ReviewReport, RevisionTemplate
+from app.models import CitationIssue, EditorAction, Manuscript, ManuscriptAssignment, ManuscriptVersion, User, ManuscriptParsed, ReviewReport, RevisionTemplate
 from app.services.citation_checker import check_citations_with_llm
 from app.services.llm import chat_completion, is_llm_configured
 from app.services.review_service import generate_full_ai_report
@@ -26,10 +27,124 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _assign_editor_action_id_for_sqlite(db: Session, action: EditorAction) -> None:
-    """SQLite 下 BIGINT 主键不会自增，手动分配 editor_actions.id。"""
+def _assign_sqlite_id(db: Session, model, obj) -> None:
+    """SQLite 下 BIGINT 主键不会自增，手动分配主键。"""
     if db.bind is not None and db.bind.dialect.name == "sqlite":
-        action.id = (db.query(func.max(EditorAction.id)).scalar() or 0) + 1
+        obj.id = (db.query(func.max(model.id)).scalar() or 0) + 1
+
+
+def _stage_order(stage: str) -> int:
+    try:
+        return REVIEW_STAGES.index(stage)
+    except ValueError:
+        return len(REVIEW_STAGES)
+
+
+def _serialize_assignments(db: Session, manuscript_ids: list[int]) -> dict[int, list[dict]]:
+    if not manuscript_ids:
+        return {}
+    rows = (
+        db.query(ManuscriptAssignment, User)
+        .join(User, User.id == ManuscriptAssignment.reviewer_id)
+        .filter(ManuscriptAssignment.manuscript_id.in_(manuscript_ids))
+        .all()
+    )
+    data: dict[int, list[dict]] = {mid: [] for mid in manuscript_ids}
+    for assignment, reviewer in rows:
+        data.setdefault(assignment.manuscript_id, []).append(
+            {
+                "id": assignment.id,
+                "review_stage": assignment.review_stage,
+                "reviewer_id": assignment.reviewer_id,
+                "reviewer_name": reviewer.real_name or reviewer.email,
+                "reviewer_email": reviewer.email,
+                "reviewer_role": reviewer.role,
+                "note": assignment.note,
+                "assigned_by": assignment.assigned_by,
+                "created_at": assignment.created_at.isoformat() if assignment.created_at else None,
+                "updated_at": assignment.updated_at.isoformat() if assignment.updated_at else None,
+            }
+        )
+    for items in data.values():
+        items.sort(key=lambda item: _stage_order(str(item.get("review_stage", ""))))
+    return data
+
+
+def _serialize_actions(db: Session, manuscript_id: int) -> list[dict]:
+    actions = db.query(EditorAction).filter(EditorAction.manuscript_id == manuscript_id).order_by(EditorAction.created_at.desc()).limit(50).all()
+    if not actions:
+        return []
+    user_ids = sorted({int(a.editor_id) for a in actions if a.editor_id is not None})
+    users = db.query(User).filter(User.id.in_(user_ids)).all() if user_ids else []
+    user_map = {u.id: u for u in users}
+    return [
+        {
+            "id": a.id,
+            "editor_id": a.editor_id,
+            "operator_name": (user_map.get(a.editor_id).real_name or user_map.get(a.editor_id).email) if user_map.get(a.editor_id) else f"用户 {a.editor_id}",
+            "operator_email": user_map.get(a.editor_id).email if user_map.get(a.editor_id) else None,
+            "operator_role": user_map.get(a.editor_id).role if user_map.get(a.editor_id) else None,
+            "action_type": a.action_type,
+            "from_status": a.from_status,
+            "to_status": a.to_status,
+            "comment": a.comment,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        }
+        for a in actions
+    ]
+
+
+def _get_manuscript_or_404(db: Session, manuscript_id: int) -> Manuscript:
+    manuscript = db.query(Manuscript).filter(Manuscript.id == manuscript_id).first()
+    if not manuscript:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
+    return manuscript
+
+
+def _can_access_manuscript(user: User, manuscript: Manuscript, assignments: list[dict]) -> bool:
+    if user.role == "admin":
+        return True
+    return any(int(item.get("reviewer_id", 0)) == user.id for item in assignments)
+
+
+def _available_actions_for_user(user: User, manuscript: Manuscript, assignments: list[dict]) -> list[str]:
+    if manuscript.status in TERMINAL_STATUSES or manuscript.status == "revision_requested":
+        return []
+
+    current_stage = manuscript.current_review_stage
+    stage_action_map = {
+        "internal": "submit_internal_review",
+        "external": "submit_external_review",
+        "final": "submit_final_submission",
+    }
+
+    if user.role == "admin":
+        actions = ["revision_request", "reject", "status_change", "accept"]
+        stage_action = stage_action_map.get(current_stage or "")
+        if stage_action:
+            actions.append(stage_action)
+        return actions
+
+    if not current_stage:
+        return []
+
+    matched = next(
+        (
+            item for item in assignments
+            if int(item.get("reviewer_id", 0)) == user.id and str(item.get("review_stage", "")) == current_stage
+        ),
+        None,
+    )
+    if not matched:
+        return []
+
+    actions = ["revision_request", "reject"]
+    stage_action = stage_action_map.get(current_stage)
+    if stage_action:
+        actions.append(stage_action)
+    if user.role in ("editor",) and current_stage == "final":
+        actions.append("accept")
+    return actions
 
 
 class EditorManuscriptListItem(BaseModel):
@@ -37,17 +152,20 @@ class EditorManuscriptListItem(BaseModel):
     manuscript_no: str
     title: str
     status: str
+    current_review_stage: str | None = None
     submitted_by: int
     created_at: str
     current_version_id: int | None
     has_report: bool = False  # 后续有 report 表后填充
+    assignments: list[dict] = []
+    available_actions: list[str] = []
 
     class Config:
         from_attributes = True
 
 
 class EditorActionBody(BaseModel):
-    action_type: str  # status_change | revision_request | reject | accept
+    action_type: str  # revision_request | reject | accept | status_change | submit_internal_review | submit_external_review | submit_final_submission
     to_status: str | None = None
     comment: str | None = None
 
@@ -55,14 +173,22 @@ class EditorActionBody(BaseModel):
 @router.get("/manuscripts")
 def editor_manuscript_list(
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[User, Depends(RequireEditor)],
+    user: Annotated[User, Depends(RequireReviewStaff)],
     page: int = 1,
     page_size: int = 20,
     status: str | None = None,
     keyword: str | None = None,
 ):
-    """编辑稿件列表，支持按状态筛选。"""
+    """审稿工作台列表。管理员可查看全部，其他角色仅查看自己被分配的稿件。"""
     q = db.query(Manuscript)
+    if user.role != "admin":
+        assignment_ids = (
+            db.query(ManuscriptAssignment.manuscript_id)
+            .filter(ManuscriptAssignment.reviewer_id == user.id)
+            .distinct()
+            .subquery()
+        )
+        q = q.filter(Manuscript.id.in_(assignment_ids))
     if status:
         q = q.filter(Manuscript.status == status)
     if keyword and keyword.strip():
@@ -75,6 +201,7 @@ def editor_manuscript_list(
         )
     total = q.count()
     items = q.order_by(Manuscript.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    assignments_map = _serialize_assignments(db, [int(m.id) for m in items])
 
     return {
         "items": [
@@ -83,10 +210,13 @@ def editor_manuscript_list(
                 manuscript_no=m.manuscript_no,
                 title=m.title,
                 status=m.status,
+                current_review_stage=m.current_review_stage,
                 submitted_by=m.submitted_by,
                 created_at=m.created_at.isoformat() if m.created_at else "",
                 current_version_id=m.current_version_id,
                 has_report=False,
+                assignments=assignments_map.get(int(m.id), []),
+                available_actions=_available_actions_for_user(user, m, assignments_map.get(int(m.id), [])),
             )
             for m in items
         ],
@@ -98,12 +228,13 @@ def editor_manuscript_list(
 def editor_manuscript_detail(
     id: int,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[User, Depends(RequireEditor)],
+    user: Annotated[User, Depends(RequireReviewStaff)],
 ):
     """稿件详情（编辑驾驶舱）：主表、当前版本、解析结果占位、报告占位、编辑操作历史。"""
-    m = db.query(Manuscript).filter(Manuscript.id == id).first()
-    if not m:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
+    m = _get_manuscript_or_404(db, id)
+    assignments = _serialize_assignments(db, [id]).get(id, [])
+    if not _can_access_manuscript(user, m, assignments):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
     # 当前版本
     version = None
     if m.current_version_id:
@@ -129,8 +260,6 @@ def editor_manuscript_detail(
             ReviewReport.report_type == "citation"
         ).first()
 
-    # 编辑操作历史
-    actions = db.query(EditorAction).filter(EditorAction.manuscript_id == id).order_by(EditorAction.created_at.desc()).limit(50).all()
     report_content, report_model = _normalize_report_payload(report_obj)
 
     citation_issues_list = []
@@ -150,6 +279,7 @@ def editor_manuscript_detail(
             "manuscript_no": m.manuscript_no,
             "title": m.title,
             "status": m.status,
+            "current_review_stage": m.current_review_stage,
             "submitted_by": m.submitted_by,
             "section_id": m.section_id,
             "current_version_id": m.current_version_id,
@@ -179,18 +309,9 @@ def editor_manuscript_detail(
         } if report_obj else None,
         "citation_issues": citation_issues_list,
         "similarity_results": [],
-        "editor_actions": [
-            {
-                "id": a.id,
-                "editor_id": a.editor_id,
-                "action_type": a.action_type,
-                "from_status": a.from_status,
-                "to_status": a.to_status,
-                "comment": a.comment,
-                "created_at": a.created_at.isoformat() if a.created_at else None,
-            }
-            for a in actions
-        ],
+        "assignments": assignments,
+        "available_actions": _available_actions_for_user(user, m, assignments),
+        "editor_actions": _serialize_actions(db, id),
     }
 
 
@@ -198,12 +319,13 @@ def editor_manuscript_detail(
 def editor_manuscript_text_for_ai_detect(
     id: int,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[User, Depends(RequireEditor)],
+    user: Annotated[User, Depends(RequireReviewStaff)],
 ):
     """返回当前稿件正文文本，供编辑端跳转 AI 检测页时自动导入。"""
-    m = db.query(Manuscript).filter(Manuscript.id == id).first()
-    if not m:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
+    m = _get_manuscript_or_404(db, id)
+    assignments = _serialize_assignments(db, [id]).get(id, [])
+    if not _can_access_manuscript(user, m, assignments):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
     if not m.current_version_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该稿件暂无版本或未解析")
 
@@ -217,7 +339,7 @@ def editor_manuscript_text_for_ai_detect(
     return {"text": text or ""}
 
 
-VALID_ACTION_TYPES = {"revision_request", "reject", "accept", "status_change"}
+VALID_ACTION_TYPES = {"revision_request", "reject", "accept", "status_change", "submit_internal_review", "submit_external_review", "submit_final_submission"}
 
 
 @router.post("/manuscripts/{id}/actions")
@@ -225,27 +347,50 @@ def editor_action(
     id: int,
     body: EditorActionBody,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[User, Depends(RequireEditor)],
+    user: Annotated[User, Depends(RequireReviewStaff)],
 ):
-    """编辑操作：状态变更、退修、退稿、录用。写 editor_actions 并更新 manuscripts.status。"""
+    """审稿流转操作：按分配阶段推进、退修、退稿或提交成稿。"""
     if body.action_type not in VALID_ACTION_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"action_type 须为 {sorted(VALID_ACTION_TYPES)} 之一",
         )
-    m = db.query(Manuscript).filter(Manuscript.id == id).first()
-    if not m:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
+    m = _get_manuscript_or_404(db, id)
+    assignments = _serialize_assignments(db, [id]).get(id, [])
+    if not _can_access_manuscript(user, m, assignments):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
+
+    allowed_actions = set(_available_actions_for_user(user, m, assignments))
+    if body.action_type not in allowed_actions and not (user.role == "admin" and body.action_type in VALID_ACTION_TYPES):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="当前阶段无此操作权限")
+
     from_status = m.status
     to_status = body.to_status
+    next_stage = m.current_review_stage
+    flow = next_flow_for_action(body.action_type)
+
     if body.action_type == "revision_request":
         to_status = "revision_requested"
     elif body.action_type == "reject":
         to_status = "rejected"
+        next_stage = None
     elif body.action_type == "accept":
         to_status = "accepted"
+        next_stage = None
+    elif flow:
+        expected_stage, flow_status, next_stage = flow
+        if m.current_review_stage != expected_stage:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="当前审稿阶段与操作不匹配")
+        to_status = flow_status
     elif body.action_type == "status_change" and body.to_status:
+        if user.role != "admin":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅管理员可手动调整状态")
         to_status = body.to_status
+        next_stage = {
+            "internal_review": "internal",
+            "external_review": "external",
+            "final_review": "final",
+        }.get(body.to_status)
     else:
         to_status = to_status or from_status
 
@@ -257,11 +402,12 @@ def editor_action(
         to_status=to_status,
         comment=body.comment,
     )
-    _assign_editor_action_id_for_sqlite(db, action)
+    _assign_sqlite_id(db, EditorAction, action)
     db.add(action)
     m.status = to_status
+    m.current_review_stage = next_stage
     db.commit()
-    return {"message": "ok", "new_status": to_status}
+    return {"message": "ok", "new_status": to_status, "current_review_stage": next_stage}
 
 
 class AiReviewResponse(BaseModel):
@@ -309,14 +455,15 @@ def _normalize_report_payload(report_obj: ReviewReport | None) -> tuple[str, str
 def editor_citation_check(
     id: int,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[User, Depends(RequireEditor)],
+    user: Annotated[User, Depends(RequireReviewStaff)],
     body: CitationCheckBody | None = Body(None),
 ):
     """对当前版本脚注执行引注规范检查，结果写入引注检查报告并返回。body.use_llm=true 时接入大模型辅助判断。"""
     use_llm = body is not None and body.use_llm
-    m = db.query(Manuscript).filter(Manuscript.id == id).first()
-    if not m:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
+    m = _get_manuscript_or_404(db, id)
+    assignments = _serialize_assignments(db, [id]).get(id, [])
+    if not _can_access_manuscript(user, m, assignments):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
     if not m.current_version_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该稿件尚无文件版本")
     parsed = db.query(ManuscriptParsed).filter(ManuscriptParsed.version_id == m.current_version_id).first()
@@ -371,7 +518,7 @@ def editor_citation_check(
 def editor_ai_review(
     id: int,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[User, Depends(RequireEditor)],
+    user: Annotated[User, Depends(RequireReviewStaff)],
 ):
     """生成该稿件的 AI 初审报告（基于标题与当前版本信息，调用大模型）。"""
     try:
@@ -380,9 +527,10 @@ def editor_ai_review(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="未配置大模型（请在 .env 中设置 DASHSCOPE_API_KEY）",
             )
-        m = db.query(Manuscript).filter(Manuscript.id == id).first()
-        if not m:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
+        m = _get_manuscript_or_404(db, id)
+        assignments = _serialize_assignments(db, [id]).get(id, [])
+        if not _can_access_manuscript(user, m, assignments):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
         if not m.current_version_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该稿件尚无文件版本")
 
@@ -448,7 +596,7 @@ def editor_ai_chat(
     id: int,
     body: AiChatBody,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[User, Depends(RequireEditor)],
+    user: Annotated[User, Depends(RequireReviewStaff)],
 ):
     """编辑端：基于当前稿件的智能对话。后端注入稿件上下文后调用大模型。"""
     if not is_llm_configured():
@@ -456,9 +604,10 @@ def editor_ai_chat(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="未配置大模型（请在 .env 中设置 DASHSCOPE_API_KEY）",
         )
-    m = db.query(Manuscript).filter(Manuscript.id == id).first()
-    if not m:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
+    m = _get_manuscript_or_404(db, id)
+    assignments = _serialize_assignments(db, [id]).get(id, [])
+    if not _can_access_manuscript(user, m, assignments):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
     context = _build_manuscript_context(db, id)
     if not context.strip():
         context = f"稿件编号：{m.manuscript_no}，标题：{m.title or '（无）'}"
@@ -492,7 +641,7 @@ def _get_revision_templates_safe(db: Session):
 def editor_revision_draft(
     id: int,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[User, Depends(RequireEditor)],
+    user: Annotated[User, Depends(RequireReviewStaff)],
 ):
     """编辑端：根据当前稿件 AI 初审报告与退修模板，生成退修意见草稿。"""
     draft = ""
@@ -502,9 +651,10 @@ def editor_revision_draft(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="未配置大模型（请在 .env 中设置 DASHSCOPE_API_KEY）",
             )
-        m = db.query(Manuscript).filter(Manuscript.id == id).first()
-        if not m:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
+        m = _get_manuscript_or_404(db, id)
+        assignments = _serialize_assignments(db, [id]).get(id, [])
+        if not _can_access_manuscript(user, m, assignments):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
         if not m.current_version_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该稿件尚无版本，无法生成退修意见")
         report_obj = db.query(ReviewReport).filter(
@@ -542,11 +692,12 @@ def editor_revision_draft(
 
 def _get_editor_version_path(id: int, version_id: int, db: Session, user: User):
     """校验权限并返回稿件版本的本地文件路径。"""
-    if user.role not in ("editor", "admin"):
+    if user.role not in ("internal_reviewer", "external_reviewer", "editor", "admin"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
-    m = db.query(Manuscript).filter(Manuscript.id == id).first()
-    if not m:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
+    m = _get_manuscript_or_404(db, id)
+    assignments = _serialize_assignments(db, [id]).get(id, [])
+    if not _can_access_manuscript(user, m, assignments):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
     v = db.query(ManuscriptVersion).filter(ManuscriptVersion.id == version_id, ManuscriptVersion.manuscript_id == id).first()
     if not v:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="版本不存在")

@@ -23,7 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
 import MarkdownRenderer from "@/components/ui/MarkdownRenderer";
 import TypewriterMarkdown from "@/components/ui/TypewriterMarkdown";
-import { STATUS_MAP } from "@/lib/constants";
+import { REVIEW_STAGE_MAP, REVIEW_STAFF_ROLES, ROLE_MAP, STATUS_MAP } from "@/lib/constants";
 import { editorApi, type EditorManuscriptDetail, type EditorManuscriptItem } from "@/services/api";
 
 const { TextArea } = Input;
@@ -48,6 +48,7 @@ export default function EditorWorkbenchPage() {
   const [revisionDraftLoading, setRevisionDraftLoading] = useState(false);
   const [revisionDraftError, setRevisionDraftError] = useState<string | null>(null);
 
+  const isReviewStaff = !!user?.role && REVIEW_STAFF_ROLES.includes(user.role as (typeof REVIEW_STAFF_ROLES)[number]);
   const loadList = useCallback(async () => {
     setLoadingList(true);
     try {
@@ -93,12 +94,12 @@ export default function EditorWorkbenchPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user || (user.role !== "editor" && user.role !== "admin")) {
+    if (!user || !isReviewStaff) {
       router.push("/");
       return;
     }
     loadList();
-  }, [user, authLoading, router, loadList]);
+  }, [user, authLoading, router, loadList, isReviewStaff]);
 
   useEffect(() => {
     setTypewriterForReportId(null);
@@ -168,15 +169,18 @@ export default function EditorWorkbenchPage() {
     [detail?.editor_actions]
   );
   const status = manuscript?.status as string | undefined;
+  const currentStage = manuscript?.current_review_stage as string | undefined;
+  const availableActions = detail?.available_actions ?? [];
+  const assignments = detail?.assignments ?? [];
 
   const timelineItems = useMemo(
     () =>
       editorActions.map((a) => ({
         color: "gray",
         children: (
-          <div>
+            <div>
             <div className="text-sm text-[#333]">
-              {String(a.action_type)}: {String(a.from_status ?? "-")} → {String(a.to_status ?? "-")}
+              {(a.operator_name ? `${String(a.operator_name)} · ` : "") + `${String(a.action_type)}: ${String(a.from_status ?? "-")} → ${String(a.to_status ?? "-")}`}
             </div>
             {a.comment ? (
               <div className="text-xs text-[#666] mt-1 rounded bg-[#fafafa] px-3 py-2">
@@ -197,7 +201,7 @@ export default function EditorWorkbenchPage() {
       </div>
     );
   }
-  if (!user || (user.role !== "editor" && user.role !== "admin")) return null;
+  if (!user || !isReviewStaff) return null;
 
   return (
     <div className="bg-[#f5f6f8]">
@@ -249,6 +253,9 @@ export default function EditorWorkbenchPage() {
                         <Tag>{STATUS_MAP[item.status] ?? item.status}</Tag>
                       </div>
                       <div className="text-sm text-[#333] mt-1">{item.title}</div>
+                      <div className="mt-1 text-xs text-[#888]">
+                        {item.current_review_stage ? `当前阶段：${REVIEW_STAGE_MAP[item.current_review_stage] ?? item.current_review_stage}` : "未进入审稿阶段"}
+                      </div>
                     </div>
                   </List.Item>
                 )}
@@ -269,43 +276,71 @@ export default function EditorWorkbenchPage() {
                   <div className="text-sm text-[#666] mb-1">当前稿件</div>
                   <div className="font-medium text-[#333]">{String(manuscript?.title ?? "—")}</div>
                   <div className="text-xs text-[#888] mt-1">{String(manuscript?.manuscript_no ?? "")}</div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {currentStage ? <Tag color="blue">{REVIEW_STAGE_MAP[currentStage] ?? currentStage}</Tag> : null}
+                    {assignments.map((item) => (
+                      <Tag key={item.id}>
+                        {REVIEW_STAGE_MAP[item.review_stage] ?? item.review_stage}：{item.reviewer_name}
+                      </Tag>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="mb-1">
-                  <Button
-                    type="dashed"
-                    size="small"
-                    onClick={runRevisionDraft}
-                    loading={revisionDraftLoading}
-                  >
-                    {revisionDraftLoading ? "生成中…" : "AI 生成退修意见草稿"}
-                  </Button>
-                  {revisionDraftError && (
-                    <Typography.Text type="danger" className="ml-2 text-sm">{revisionDraftError}</Typography.Text>
-                  )}
-                </div>
-                <TextArea
-                  rows={7}
-                  value={revisionComment}
-                  onChange={(e) => setRevisionComment(e.target.value)}
-                  placeholder="在此填写退修意见（点击“提交退修”时发送给作者）"
-                />
+                {availableActions.includes("revision_request") && (
+                  <>
+                    <div className="mb-1">
+                      <Button
+                        type="dashed"
+                        size="small"
+                        onClick={runRevisionDraft}
+                        loading={revisionDraftLoading}
+                      >
+                        {revisionDraftLoading ? "生成中…" : "AI 生成退修意见草稿"}
+                      </Button>
+                      {revisionDraftError && (
+                        <Typography.Text type="danger" className="ml-2 text-sm">{revisionDraftError}</Typography.Text>
+                      )}
+                    </div>
+                    <TextArea
+                      rows={7}
+                      value={revisionComment}
+                      onChange={(e) => setRevisionComment(e.target.value)}
+                      placeholder="在此填写退修意见（点击“提交退修”时发送给作者）"
+                    />
+                  </>
+                )}
 
                 <Space wrap>
-                  <Button onClick={() => runAction("revision_request")} loading={actionLoading}>
-                    提交退修
-                  </Button>
-                  <Button danger onClick={() => runAction("reject")} loading={actionLoading}>
-                    退稿
-                  </Button>
-                  <Button
-                    type="primary"
-                    className="!bg-[#8B1538] hover:!bg-[#70122e]"
-                    onClick={() => runAction("accept")}
-                    loading={actionLoading}
-                  >
-                    录用
-                  </Button>
+                  {availableActions.includes("revision_request") && (
+                    <Button onClick={() => runAction("revision_request")} loading={actionLoading}>
+                      提交退修
+                    </Button>
+                  )}
+                  {availableActions.includes("reject") && (
+                    <Button danger onClick={() => runAction("reject")} loading={actionLoading}>
+                      退稿
+                    </Button>
+                  )}
+                  {availableActions.includes("submit_internal_review") && (
+                    <Button type="primary" className="!bg-[#8B1538] hover:!bg-[#70122e]" onClick={() => runAction("submit_internal_review")} loading={actionLoading}>
+                      提交内审
+                    </Button>
+                  )}
+                  {availableActions.includes("submit_external_review") && (
+                    <Button type="primary" className="!bg-[#8B1538] hover:!bg-[#70122e]" onClick={() => runAction("submit_external_review")} loading={actionLoading}>
+                      提交外审
+                    </Button>
+                  )}
+                  {availableActions.includes("submit_final_submission") && (
+                    <Button type="primary" className="!bg-[#8B1538] hover:!bg-[#70122e]" onClick={() => runAction("submit_final_submission")} loading={actionLoading}>
+                      提交成稿
+                    </Button>
+                  )}
+                  {availableActions.includes("accept") && (
+                    <Button type="primary" className="!bg-[#8B1538] hover:!bg-[#70122e]" onClick={() => runAction("accept")} loading={actionLoading}>
+                      录用
+                    </Button>
+                  )}
                   <Button type="dashed" onClick={runAiReview} loading={aiReviewLoading}>
                     生成 AI 初审报告
                   </Button>
@@ -341,7 +376,13 @@ export default function EditorWorkbenchPage() {
                   <Descriptions.Item label="状态">
                     <Tag>{STATUS_MAP[status ?? ""] ?? status}</Tag>
                   </Descriptions.Item>
+                  <Descriptions.Item label="当前阶段">
+                    {currentStage ? <Tag color="blue">{REVIEW_STAGE_MAP[currentStage] ?? currentStage}</Tag> : "—"}
+                  </Descriptions.Item>
                   <Descriptions.Item label="投稿人">{String(manuscript?.submitted_by ?? "—")}</Descriptions.Item>
+                  <Descriptions.Item label="审稿分配">
+                    {assignments.length > 0 ? assignments.map((item) => `${REVIEW_STAGE_MAP[item.review_stage] ?? item.review_stage}: ${item.reviewer_name}${item.reviewer_role ? `（${ROLE_MAP[item.reviewer_role] ?? item.reviewer_role}）` : ""}`).join("；") : "—"}
+                  </Descriptions.Item>
                   <Descriptions.Item label="当前版本">
                     {currentVersion ? (
                       <Space>

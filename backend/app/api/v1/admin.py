@@ -5,11 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException, Response, Query, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.core.deps import RequireAdmin, get_db
+from app.core.review_workflow import VALID_USER_ROLES, can_be_assigned_to_stage, next_flow_for_action, status_for_stage, TERMINAL_STATUSES
 from app.core.security import hash_password
-from app.models import EditorAction, Manuscript, RevisionTemplate, Section, SystemConfig, User
+from app.models import EditorAction, Manuscript, ManuscriptAssignment, RevisionTemplate, Section, SystemConfig, User
 
 router = APIRouter()
 
@@ -24,6 +25,38 @@ def _assign_editor_action_id_for_sqlite(db: Session, action: EditorAction) -> No
     """SQLite 下 BIGINT 主键不会自增，这里手动分配。"""
     if db.bind is not None and db.bind.dialect.name == "sqlite":
         action.id = (db.query(func.max(EditorAction.id)).scalar() or 0) + 1
+
+
+def _assign_assignment_id_for_sqlite(db: Session, assignment: ManuscriptAssignment) -> None:
+    if db.bind is not None and db.bind.dialect.name == "sqlite":
+        assignment.id = (db.query(func.max(ManuscriptAssignment.id)).scalar() or 0) + 1
+
+
+def _serialize_assignments(db: Session, manuscript_ids: list[int]) -> dict[int, list[dict]]:
+    if not manuscript_ids:
+        return {}
+    rows = (
+        db.query(ManuscriptAssignment, User)
+        .join(User, User.id == ManuscriptAssignment.reviewer_id)
+        .filter(ManuscriptAssignment.manuscript_id.in_(manuscript_ids))
+        .all()
+    )
+    result: dict[int, list[dict]] = {mid: [] for mid in manuscript_ids}
+    for assignment, reviewer in rows:
+        result.setdefault(assignment.manuscript_id, []).append(
+            {
+                "id": assignment.id,
+                "review_stage": assignment.review_stage,
+                "reviewer_id": assignment.reviewer_id,
+                "reviewer_name": reviewer.real_name or reviewer.email,
+                "reviewer_email": reviewer.email,
+                "reviewer_role": reviewer.role,
+                "note": assignment.note,
+                "created_at": assignment.created_at.isoformat() if assignment.created_at else None,
+                "updated_at": assignment.updated_at.isoformat() if assignment.updated_at else None,
+            }
+        )
+    return result
 
 
 def _validate_password(password: str) -> None:
@@ -61,11 +94,27 @@ class UpdateUserBody(BaseModel):
     password: str | None = None
 
 
+class AdminRecentActionItem(BaseModel):
+    id: int
+    manuscript_id: int
+    manuscript_no: str | None
+    manuscript_title: str | None
+    action_type: str
+    from_status: str | None
+    to_status: str | None
+    comment: str | None
+    editor_id: int
+    editor_email: str | None
+    editor_name: str | None
+    created_at: str
+
+
 class AdminManuscriptItem(BaseModel):
     id: int
     manuscript_no: str
     title: str
     status: str
+    current_review_stage: str | None = None
     submitted_by: int
     submitted_by_email: str | None
     section_id: int | None
@@ -73,6 +122,7 @@ class AdminManuscriptItem(BaseModel):
     current_version_id: int | None
     created_at: str
     updated_at: str | None
+    assignments: list[dict] = []
 
 
 @router.get("/users", response_model=dict)
@@ -117,6 +167,30 @@ def list_users(
     }
 
 
+@router.get("/users/recent", response_model=dict)
+def list_recent_users(
+    _user: User = Depends(RequireAdmin),
+    db: Session = Depends(get_db),
+    limit: int = Query(8, ge=1, le=50),
+):
+    users = db.query(User).order_by(User.created_at.desc(), User.id.desc()).limit(limit).all()
+    return {
+        "items": [
+            AdminUserItem(
+                id=u.id,
+                email=u.email,
+                real_name=u.real_name,
+                role=u.role,
+                institution=u.institution,
+                is_active=u.is_active,
+                created_at=u.created_at.isoformat() if u.created_at else "",
+            )
+            for u in users
+        ],
+        "total": len(users),
+    }
+
+
 @router.get("/manuscripts", response_model=dict)
 def list_manuscripts(
     _user: User = Depends(RequireAdmin),
@@ -145,6 +219,7 @@ def list_manuscripts(
         )
     total = q.count()
     rows = q.order_by(Manuscript.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    assignments_map = _serialize_assignments(db, [int(m.id) for m, _, _ in rows])
     return {
         "items": [
             AdminManuscriptItem(
@@ -152,6 +227,7 @@ def list_manuscripts(
                 manuscript_no=m.manuscript_no,
                 title=m.title,
                 status=m.status,
+                current_review_stage=m.current_review_stage,
                 submitted_by=m.submitted_by,
                 submitted_by_email=email,
                 section_id=m.section_id,
@@ -159,6 +235,7 @@ def list_manuscripts(
                 current_version_id=m.current_version_id,
                 created_at=m.created_at.isoformat() if m.created_at else "",
                 updated_at=m.updated_at.isoformat() if m.updated_at else None,
+                assignments=assignments_map.get(int(m.id), []),
             )
             for m, email, section_name in rows
         ],
@@ -167,12 +244,12 @@ def list_manuscripts(
 
 
 class AdminManuscriptActionBody(BaseModel):
-    action_type: str  # status_change | revision_request | reject | accept
+    action_type: str  # status_change | revision_request | reject | accept | submit_internal_review | submit_external_review | submit_final_submission
     to_status: str | None = None
     comment: str | None = None
 
 
-_VALID_ACTION_TYPES = {"revision_request", "reject", "accept", "status_change"}
+_VALID_ACTION_TYPES = {"revision_request", "reject", "accept", "status_change", "submit_internal_review", "submit_external_review", "submit_final_submission"}
 
 
 @router.post("/manuscripts/{manuscript_id}/actions", response_model=dict)
@@ -193,14 +270,28 @@ def manuscript_action(
 
     from_status = m.status
     to_status = body.to_status
+    next_stage = m.current_review_stage
+    flow = next_flow_for_action(body.action_type)
     if body.action_type == "revision_request":
         to_status = "revision_requested"
     elif body.action_type == "reject":
         to_status = "rejected"
+        next_stage = None
     elif body.action_type == "accept":
         to_status = "accepted"
+        next_stage = None
+    elif flow:
+        expected_stage, flow_status, next_stage = flow
+        if m.current_review_stage != expected_stage:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="当前审稿阶段与操作不匹配")
+        to_status = flow_status
     elif body.action_type == "status_change" and body.to_status:
         to_status = body.to_status
+        next_stage = {
+            "internal_review": "internal",
+            "external_review": "external",
+            "final_review": "final",
+        }.get(body.to_status)
     else:
         to_status = to_status or from_status
 
@@ -215,8 +306,113 @@ def manuscript_action(
     _assign_editor_action_id_for_sqlite(db, action)
     db.add(action)
     m.status = to_status
+    m.current_review_stage = next_stage
     db.commit()
-    return {"message": "ok", "new_status": to_status}
+    return {"message": "ok", "new_status": to_status, "current_review_stage": next_stage}
+
+
+class ManuscriptAssignmentBody(BaseModel):
+    review_stage: str
+    reviewer_id: int
+    note: str | None = None
+    activate_stage: bool = True
+
+
+@router.put("/manuscripts/{manuscript_id}/assignments", response_model=dict)
+def upsert_manuscript_assignment(
+    manuscript_id: int,
+    body: ManuscriptAssignmentBody,
+    current_user: User = Depends(RequireAdmin),
+    db: Session = Depends(get_db),
+):
+    manuscript = db.query(Manuscript).filter(Manuscript.id == manuscript_id).first()
+    if not manuscript:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="稿件不存在")
+    if body.review_stage not in ("internal", "external", "final"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="review_stage 须为 internal / external / final")
+
+    reviewer = db.query(User).filter(User.id == body.reviewer_id, User.is_active.is_(True)).first()
+    if not reviewer:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="审稿人不存在或已停用")
+    if not can_be_assigned_to_stage(reviewer.role, body.review_stage):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该用户角色不能被分配到当前审稿阶段")
+
+    assignment = db.query(ManuscriptAssignment).filter(
+        ManuscriptAssignment.manuscript_id == manuscript_id,
+        ManuscriptAssignment.review_stage == body.review_stage,
+    ).first()
+    if assignment:
+        assignment.reviewer_id = reviewer.id
+        assignment.assigned_by = current_user.id
+        assignment.note = body.note
+    else:
+        assignment = ManuscriptAssignment(
+            manuscript_id=manuscript_id,
+            reviewer_id=reviewer.id,
+            assigned_by=current_user.id,
+            review_stage=body.review_stage,
+            note=body.note,
+        )
+        _assign_assignment_id_for_sqlite(db, assignment)
+        db.add(assignment)
+
+    if body.activate_stage:
+        if manuscript.status in TERMINAL_STATUSES:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="终态稿件不能重新分配审稿阶段")
+        manuscript.current_review_stage = body.review_stage
+        if manuscript.status != "revision_requested":
+            manuscript.status = status_for_stage(body.review_stage) or manuscript.status
+
+    db.commit()
+    return {
+        "message": "ok",
+        "status": manuscript.status,
+        "current_review_stage": manuscript.current_review_stage,
+        "assignments": _serialize_assignments(db, [manuscript_id]).get(manuscript_id, []),
+    }
+
+
+@router.get("/actions/recent", response_model=dict)
+def list_recent_actions(
+    _user: User = Depends(RequireAdmin),
+    db: Session = Depends(get_db),
+    limit: int = Query(10, ge=1, le=100),
+):
+    editor = aliased(User)
+    rows = (
+        db.query(
+            EditorAction,
+            Manuscript.manuscript_no,
+            Manuscript.title,
+            editor.email,
+            editor.real_name,
+        )
+        .join(Manuscript, Manuscript.id == EditorAction.manuscript_id)
+        .outerjoin(editor, editor.id == EditorAction.editor_id)
+        .order_by(EditorAction.created_at.desc(), EditorAction.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return {
+        "items": [
+            AdminRecentActionItem(
+                id=action.id,
+                manuscript_id=action.manuscript_id,
+                manuscript_no=manuscript_no,
+                manuscript_title=manuscript_title,
+                action_type=action.action_type,
+                from_status=action.from_status,
+                to_status=action.to_status,
+                comment=action.comment,
+                editor_id=action.editor_id,
+                editor_email=editor_email,
+                editor_name=editor_name,
+                created_at=action.created_at.isoformat() if action.created_at else "",
+            )
+            for action, manuscript_no, manuscript_title, editor_email, editor_name in rows
+        ],
+        "total": len(rows),
+    }
 
 
 @router.post("/users", response_model=AdminUserItem)
@@ -228,8 +424,8 @@ def create_user(
     email = str(body.email).strip().lower()
     if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该邮箱已存在")
-    if body.role not in ("author", "editor", "admin"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="角色须为 author / editor / admin")
+    if body.role not in VALID_USER_ROLES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="角色不合法")
     _validate_password(body.password)
     user = User(
         email=email,
@@ -265,8 +461,8 @@ def update_user(
     if body.real_name is not None:
         user.real_name = body.real_name
     if body.role is not None:
-        if body.role not in ("author", "editor", "admin"):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="角色须为 author / editor / admin")
+        if body.role not in VALID_USER_ROLES:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="角色不合法")
         if user.id == current_user.id and body.role != "admin":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能将当前管理员账号降级")
         user.role = body.role
@@ -605,7 +801,7 @@ def get_stats(
     by_status = db.query(Manuscript.status, func.count(Manuscript.id)).group_by(Manuscript.status).all()
     status_counts = {s: c for s, c in by_status}
     # 待处理：submitted, parsing, under_review, revision_requested, revised_submitted
-    pending_statuses = ("submitted", "parsing", "under_review", "revision_requested", "revised_submitted")
+    pending_statuses = ("submitted", "parsing", "under_review", "internal_review", "external_review", "final_review", "revision_requested", "revised_submitted")
     pending = sum(status_counts.get(s, 0) for s in pending_statuses)
     user_counts = db.query(User.role, func.count(User.id)).group_by(User.role).all()
     users_by_role = {r: c for r, c in user_counts}

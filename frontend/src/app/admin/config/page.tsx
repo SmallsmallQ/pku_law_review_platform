@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Button, Card, Form, Input, message } from "antd";
-import { adminApi, type ConfigItem } from "@/services/api";
+import { adminApi } from "@/services/api";
 
 export default function AdminConfigPage() {
-  const [items, setItems] = useState<ConfigItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
@@ -14,11 +13,10 @@ export default function AdminConfigPage() {
     adminApi
       .config()
       .then((res) => {
-        setItems(res.items);
         const keys = res.items.length ? res.items.map((i) => ({ key: i.key, value: i.value ?? "" })) : [{ key: "", value: "" }];
         form.setFieldsValue({ keys });
       })
-      .catch(() => setItems([]))
+      .catch(() => undefined)
       .finally(() => setLoading(false));
   }, [form]);
 
@@ -35,17 +33,11 @@ export default function AdminConfigPage() {
       .then(() => {
         message.success("保存成功");
         adminApi.config().then((res) => {
-          setItems(res.items);
           form.setFieldsValue({ keys: res.items.map((i) => ({ key: i.key, value: i.value ?? "" })) });
         });
       })
       .catch((e) => message.error(e?.message || "保存失败"))
       .finally(() => setSubmitting(false));
-  };
-
-  const addRow = () => {
-    const keys = form.getFieldValue("keys") ?? [];
-    form.setFieldsValue({ keys: [...keys, { key: "", value: "" }] });
   };
 
   if (loading) return <p className="text-[#666]">加载中…</p>;

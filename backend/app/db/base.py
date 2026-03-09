@@ -95,7 +95,36 @@ def get_db():
         db.close()
 
 
+def _column_exists(conn, table_name: str, column_name: str) -> bool:
+    rows = conn.execute(text(f'PRAGMA table_info("{table_name}")')).mappings().all()
+    return any(str(r.get("name", "")).lower() == column_name.lower() for r in rows)
+
+
+def _apply_sqlite_compat_migrations() -> None:
+    if engine.dialect.name != "sqlite":
+        return
+    with engine.begin() as conn:
+        if not _column_exists(conn, "manuscripts", "current_review_stage"):
+            conn.execute(text('ALTER TABLE manuscripts ADD COLUMN current_review_stage VARCHAR(20)'))
+        if _column_exists(conn, "manuscripts", "status"):
+            conn.execute(
+                text(
+                    """
+                    UPDATE manuscripts
+                    SET current_review_stage = CASE
+                        WHEN current_review_stage IS NOT NULL THEN current_review_stage
+                        WHEN status IN ('under_review', 'internal_review') THEN 'internal'
+                        WHEN status = 'external_review' THEN 'external'
+                        WHEN status = 'final_review' THEN 'final'
+                        ELSE current_review_stage
+                    END
+                    """
+                )
+            )
+
+
 def init_db():
     """创建所有表（开发/测试用；生产建议用 Alembic 迁移）。"""
     import app.models  # noqa: F401 — 注册所有表
     Base.metadata.create_all(bind=engine)
+    _apply_sqlite_compat_migrations()

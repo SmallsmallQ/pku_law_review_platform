@@ -7,6 +7,7 @@ from fastapi import Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
+from app.core.review_workflow import VALID_USER_ROLES
 from app.db.base import get_db
 from app.models import User
 
@@ -61,6 +62,7 @@ def require_roles(*roles: str):
 
 
 # 常用角色依赖
+RequireReviewStaff = require_roles("internal_reviewer", "external_reviewer", "editor", "admin")
 RequireEditor = require_roles("editor", "admin")
 RequireAdmin = require_roles("admin")
 
