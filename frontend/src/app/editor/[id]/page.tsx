@@ -11,8 +11,10 @@ import {
   Descriptions,
   Drawer,
   Input,
+  InputNumber,
   List,
   Modal,
+  Select,
   Space,
   Spin,
   Tag,
@@ -23,7 +25,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
 import TypewriterMarkdown from "@/components/ui/TypewriterMarkdown";
 import { REVIEW_STAGE_MAP, REVIEW_STAFF_ROLES, ROLE_MAP, STATUS_MAP } from "@/lib/constants";
-import { editorApi, type EditorManuscriptDetail } from "@/services/api";
+import { editorApi, type EditorManuscriptDetail, type ReviewSubmissionItem } from "@/services/api";
+
+const REVIEW_RECOMMENDATION_MAP: Record<string, string> = {
+  accept: "建议通过",
+  minor_revision: "建议小修",
+  major_revision: "建议大修",
+  reject: "建议退稿",
+};
 
 export default function EditorManuscriptDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -67,6 +76,16 @@ export default function EditorManuscriptDetailPage() {
   const [citationCheckLoading, setCitationCheckLoading] = useState(false);
   const [citationCheckError, setCitationCheckError] = useState<string | null>(null);
   const [citationCheckUseLlm, setCitationCheckUseLlm] = useState(false);
+  const [reviewSubmitLoading, setReviewSubmitLoading] = useState(false);
+  const [reviewRecommendation, setReviewRecommendation] = useState<string>("major_revision");
+  const [overallScore, setOverallScore] = useState<number | null>(null);
+  const [originalityScore, setOriginalityScore] = useState<number | null>(null);
+  const [rigorScore, setRigorScore] = useState<number | null>(null);
+  const [writingScore, setWritingScore] = useState<number | null>(null);
+  const [reviewSummary, setReviewSummary] = useState("");
+  const [reviewMajorIssues, setReviewMajorIssues] = useState("");
+  const [reviewRequirements, setReviewRequirements] = useState("");
+  const [reviewConfidentialNotes, setReviewConfidentialNotes] = useState("");
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -181,16 +200,69 @@ export default function EditorManuscriptDetailPage() {
     }
   };
 
+  const manuscript = detail?.manuscript as Record<string, unknown> | undefined;
+  const currentVersion = detail?.current_version as Record<string, unknown> | undefined;
+  const parsed = detail?.parsed as Record<string, unknown> | undefined;
+  const editorActions = (detail?.editor_actions as Record<string, unknown>[]) || [];
+  const assignments = (detail?.assignments as Array<Record<string, unknown>>) || [];
+  const availableActions = (detail?.available_actions as string[]) || [];
+  const reviewSubmissions = (detail?.review_submissions as ReviewSubmissionItem[]) || [];
+  const citationIssues = (detail?.citation_issues as Array<{ location: string; description: string; suggestion?: string }>) || [];
+  const status = manuscript?.status as string | undefined;
+  const currentStage = manuscript?.current_review_stage as string | undefined;
+  const manuscriptNo = manuscript?.manuscript_no as string | undefined;
+  const title = manuscript?.title as string | undefined;
+  const breadcrumbTitle = manuscriptNo || (title ? `${String(title).slice(0, 20)}${String(title).length > 20 ? "…" : ""}` : "稿件详情");
+  const currentStageAssignment = assignments.find((item) => Number(item.reviewer_id) === user?.id && String(item.review_stage) === currentStage);
+  const currentUserReview = reviewSubmissions.find((item) => item.reviewer_id === user?.id && item.review_stage === currentStage);
+
   const jumpToAiDetect = useCallback(() => {
     if (!id) return;
     router.push(`/ai-detect?source=editor&manuscriptId=${id}`);
   }, [id, router]);
+
+  const submitStructuredReview = useCallback(async () => {
+    if (!id || !currentStage) return;
+    setReviewSubmitLoading(true);
+    try {
+      const res = await editorApi.submitStructuredReview(Number(id), {
+        review_stage: currentStage,
+        recommendation: reviewRecommendation,
+        overall_score: overallScore,
+        originality_score: originalityScore,
+        rigor_score: rigorScore,
+        writing_score: writingScore,
+        summary: reviewSummary,
+        major_issues: reviewMajorIssues,
+        revision_requirements: reviewRequirements,
+        confidential_notes: reviewConfidentialNotes,
+      });
+      setDetail((prev) => (prev ? { ...prev, review_submissions: res.review_submissions } : prev));
+      setSuccessMessage("结构化审稿意见已保存");
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "提交审稿意见失败");
+    } finally {
+      setReviewSubmitLoading(false);
+    }
+  }, [currentStage, id, overallScore, originalityScore, reviewConfidentialNotes, reviewMajorIssues, reviewRecommendation, reviewRequirements, reviewSummary, rigorScore, writingScore]);
 
   useEffect(() => {
     if (!successMessage) return;
     const t = setTimeout(() => setSuccessMessage(null), 3000);
     return () => clearTimeout(t);
   }, [successMessage]);
+
+  useEffect(() => {
+    setReviewRecommendation(currentUserReview?.recommendation ?? "major_revision");
+    setOverallScore(currentUserReview?.overall_score ?? null);
+    setOriginalityScore(currentUserReview?.originality_score ?? null);
+    setRigorScore(currentUserReview?.rigor_score ?? null);
+    setWritingScore(currentUserReview?.writing_score ?? null);
+    setReviewSummary(currentUserReview?.summary ?? "");
+    setReviewMajorIssues(currentUserReview?.major_issues ?? "");
+    setReviewRequirements(currentUserReview?.revision_requirements ?? "");
+    setReviewConfidentialNotes(currentUserReview?.confidential_notes ?? "");
+  }, [currentUserReview]);
 
   useEffect(() => {
     return () => {
@@ -204,19 +276,6 @@ export default function EditorManuscriptDetailPage() {
       }
     };
   }, []);
-
-  const manuscript = detail?.manuscript as Record<string, unknown> | undefined;
-  const currentVersion = detail?.current_version as Record<string, unknown> | undefined;
-  const parsed = detail?.parsed as Record<string, unknown> | undefined;
-  const editorActions = (detail?.editor_actions as Record<string, unknown>[]) || [];
-  const assignments = (detail?.assignments as Array<Record<string, unknown>>) || [];
-  const availableActions = (detail?.available_actions as string[]) || [];
-  const citationIssues = (detail?.citation_issues as Array<{ location: string; description: string; suggestion?: string }>) || [];
-  const status = manuscript?.status as string | undefined;
-  const currentStage = manuscript?.current_review_stage as string | undefined;
-  const manuscriptNo = manuscript?.manuscript_no as string | undefined;
-  const title = manuscript?.title as string | undefined;
-  const breadcrumbTitle = manuscriptNo || (title ? `${String(title).slice(0, 20)}${String(title).length > 20 ? "…" : ""}` : "稿件详情");
 
   /** 请求后端将当前版本 Word 转为 PDF 并返回，用于预览 */
   const loadPdfPreview = useCallback(async () => {
@@ -427,6 +486,39 @@ export default function EditorManuscriptDetailPage() {
                       )}
                     </Space>
                   </Card>
+                  {currentStage && (
+                    <Card size="small" title="结构化审稿意见" className="shadow-sm">
+                      {currentStageAssignment ? (
+                        <div className="space-y-3">
+                          <Typography.Text type="secondary" className="text-xs">
+                            当前以「{REVIEW_STAGE_MAP[currentStage] ?? currentStage}」身份提交意见。保存后，可继续点击对应阶段按钮推进流程。
+                          </Typography.Text>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Select
+                              value={reviewRecommendation}
+                              onChange={setReviewRecommendation}
+                              options={Object.entries(REVIEW_RECOMMENDATION_MAP).map(([value, label]) => ({ value, label }))}
+                            />
+                            <InputNumber min={1} max={10} value={overallScore ?? undefined} onChange={(v) => setOverallScore(v == null ? null : Number(v))} placeholder="综合评分" className="w-full" />
+                            <InputNumber min={1} max={10} value={originalityScore ?? undefined} onChange={(v) => setOriginalityScore(v == null ? null : Number(v))} placeholder="创新性" className="w-full" />
+                            <InputNumber min={1} max={10} value={rigorScore ?? undefined} onChange={(v) => setRigorScore(v == null ? null : Number(v))} placeholder="论证严谨性" className="w-full" />
+                            <InputNumber min={1} max={10} value={writingScore ?? undefined} onChange={(v) => setWritingScore(v == null ? null : Number(v))} placeholder="文字与结构" className="w-full" />
+                          </div>
+                          <Input.TextArea rows={3} value={reviewSummary} onChange={(e) => setReviewSummary(e.target.value)} placeholder="总体评价摘要" />
+                          <Input.TextArea rows={4} value={reviewMajorIssues} onChange={(e) => setReviewMajorIssues(e.target.value)} placeholder="主要问题" />
+                          <Input.TextArea rows={4} value={reviewRequirements} onChange={(e) => setReviewRequirements(e.target.value)} placeholder="修改要求 / 处理建议" />
+                          <Input.TextArea rows={3} value={reviewConfidentialNotes} onChange={(e) => setReviewConfidentialNotes(e.target.value)} placeholder="仅编辑部可见备注（可选）" />
+                          <Button type="primary" size="small" onClick={submitStructuredReview} loading={reviewSubmitLoading}>
+                            保存结构化意见
+                          </Button>
+                        </div>
+                      ) : (
+                        <Typography.Text type="secondary" className="text-xs">
+                          当前阶段未分配给你，仅可查看已提交的审稿意见。
+                        </Typography.Text>
+                      )}
+                    </Card>
+                  )}
                   {aiError && <Alert message={aiError} type="error" showIcon />}
                   <Card size="small" title="引注检查" className="shadow-sm">
                     <Space wrap className="mb-2" align="center" size="small">
@@ -470,6 +562,30 @@ export default function EditorManuscriptDetailPage() {
                       </div>
                     </Card>
                   )}
+                  {reviewSubmissions.length > 0 && (
+                    <Card size="small" title="已提交审稿意见" className="shadow-sm">
+                      <List
+                        size="small"
+                        dataSource={reviewSubmissions}
+                        renderItem={(item) => (
+                          <List.Item className="!px-0">
+                            <div className="w-full text-xs text-[#444]">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Tag color="blue">{REVIEW_STAGE_MAP[item.review_stage] ?? item.review_stage}</Tag>
+                                <Tag>{REVIEW_RECOMMENDATION_MAP[item.recommendation] ?? item.recommendation}</Tag>
+                                <span>{item.reviewer_name}</span>
+                                {item.overall_score != null ? <span>综合 {item.overall_score}/10</span> : null}
+                              </div>
+                              {item.summary ? <div className="mt-2 whitespace-pre-wrap">{item.summary}</div> : null}
+                              {item.major_issues ? <div className="mt-1 text-[#666]">主要问题：{item.major_issues}</div> : null}
+                              {item.revision_requirements ? <div className="mt-1 text-[#666]">修改建议：{item.revision_requirements}</div> : null}
+                              {item.updated_at ? <div className="mt-1 text-[#999]">{String(item.updated_at).slice(0, 16)}</div> : null}
+                            </div>
+                          </List.Item>
+                        )}
+                      />
+                    </Card>
+                  )}
                   {editorActions.length > 0 && (
                     <Card size="small" title="操作记录" className="shadow-sm">
                       <List
@@ -493,11 +609,11 @@ export default function EditorManuscriptDetailPage() {
                 </div>
 
                 {/* 右侧：稿件预览（主视觉区域） */}
-                <div className="order-1 self-start xl:order-2">
+                <div className="order-1 !self-start xl:order-2 xl:!self-start">
                   <Card
                     size="small"
                     title="原始稿件"
-                    className="shadow-sm"
+                    className="!h-auto shadow-sm"
                     extra={
                       currentVersion ? (
                         <a href={editorApi.downloadUrl(Number(id), Number(currentVersion.id))} target="_blank" rel="noopener noreferrer" className="text-xs">
@@ -529,14 +645,14 @@ export default function EditorManuscriptDetailPage() {
                           <iframe
                             src={previewUrl}
                             title="原始稿件 PDF 预览"
-                            className="h-[75vh] min-h-[520px] w-full rounded border border-[#e8e8e8] bg-white"
+                            className="h-[68vh] min-h-[420px] w-full rounded border border-[#e8e8e8] bg-white"
                           />
                         ) : null}
                         {!previewLoading && (previewType === "docx" || previewType === "doc") && pdfPreviewUrl ? (
                           <iframe
                             src={pdfPreviewUrl}
                             title="Word 转 PDF 预览"
-                            className="h-[75vh] min-h-[520px] w-full rounded border border-[#e8e8e8] bg-white"
+                            className="h-[68vh] min-h-[420px] w-full rounded border border-[#e8e8e8] bg-white"
                           />
                         ) : null}
                         {!previewLoading && (previewType === "docx" || previewType === "doc") && !pdfPreviewUrl && (
@@ -551,7 +667,7 @@ export default function EditorManuscriptDetailPage() {
                             </Button>
                             {pdfPreviewError && <Alert message={pdfPreviewError} type="warning" showIcon />}
                             {previewType === "docx" && (
-                              <div className="max-h-[60vh] min-h-[320px] overflow-y-auto border border-[#e8e8e8] rounded bg-white p-4 text-sm leading-7 text-[#2c2c2e]">
+                              <div className="max-h-[68vh] overflow-y-auto border border-[#e8e8e8] rounded bg-white p-4 text-sm leading-7 text-[#2c2c2e]">
                                 {docxPreviewText ? (
                                   <pre className="whitespace-pre-wrap font-sans">{docxPreviewText}</pre>
                                 ) : (

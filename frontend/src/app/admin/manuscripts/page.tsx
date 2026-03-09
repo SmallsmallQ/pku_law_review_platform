@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Checkbox, Input, Modal, Select, Space, Table, Tag, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { REVIEW_STAGE_MAP, ROLE_MAP, STATUS_MAP } from "@/lib/constants";
@@ -30,7 +30,7 @@ export default function AdminManuscriptsPage() {
   const [assignNote, setAssignNote] = useState("");
   const [activateStage, setActivateStage] = useState(true);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     adminApi
       .manuscripts({
@@ -46,11 +46,11 @@ export default function AdminManuscriptsPage() {
       })
       .catch(() => setList([]))
       .finally(() => setLoading(false));
-  };
+  }, [keyword, page, sectionFilter, statusFilter]);
 
   useEffect(() => {
     load();
-  }, [page, statusFilter, sectionFilter, keyword]);
+  }, [load]);
 
   useEffect(() => {
     adminApi.sections().then((res) => setSections(res.items)).catch(() => setSections([]));

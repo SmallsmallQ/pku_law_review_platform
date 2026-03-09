@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Button, Card, Space, Typography } from "antd";
 import { useAuth } from "@/contexts/AuthContext";
+import { REVIEW_STAFF_ROLES } from "@/lib/constants";
 
 const ACTIONS = [
   { label: "作者投稿", href: "/submit", desc: "提交论文" },
@@ -12,7 +13,7 @@ const ACTIONS = [
 
 export default function HomeSidebar() {
   const { user } = useAuth();
-  const isEditor = user?.role === "editor" || user?.role === "admin";
+  const isEditor = !!user?.role && REVIEW_STAFF_ROLES.includes(user.role as (typeof REVIEW_STAFF_ROLES)[number]);
   let actions = [...ACTIONS];
   if (isEditor) {
     actions = [ACTIONS[1], ACTIONS[0], ACTIONS[2]];

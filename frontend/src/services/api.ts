@@ -206,6 +206,26 @@ export interface ManuscriptAssignmentItem {
   updated_at?: string | null;
 }
 
+export interface ReviewSubmissionItem {
+  id: number;
+  review_stage: string;
+  reviewer_id: number;
+  reviewer_name: string;
+  reviewer_email?: string | null;
+  reviewer_role?: string | null;
+  recommendation: string;
+  overall_score?: number | null;
+  originality_score?: number | null;
+  rigor_score?: number | null;
+  writing_score?: number | null;
+  summary?: string | null;
+  major_issues?: string | null;
+  revision_requirements?: string | null;
+  confidential_notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 export interface EditorManuscriptDetail {
   manuscript?: Record<string, unknown>;
   current_version?: Record<string, unknown>;
@@ -213,6 +233,7 @@ export interface EditorManuscriptDetail {
   editor_actions?: Record<string, unknown>[];
   assignments?: ManuscriptAssignmentItem[];
   available_actions?: string[];
+  review_submissions?: ReviewSubmissionItem[];
   citation_issues?: Array<{
     location: string;
     issue_type?: string;
@@ -237,6 +258,23 @@ export const editorApi = {
     request<{ text: string }>(`editor/manuscripts/${id}/text-for-ai-detect`),
   action: (id: number, body: { action_type: string; to_status?: string; comment?: string }) =>
     request<{ message: string; new_status: string; current_review_stage?: string | null }>(`editor/manuscripts/${id}/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  submitStructuredReview: (id: number, body: {
+    review_stage: string;
+    recommendation: string;
+    overall_score?: number | null;
+    originality_score?: number | null;
+    rigor_score?: number | null;
+    writing_score?: number | null;
+    summary?: string;
+    major_issues?: string;
+    revision_requirements?: string;
+    confidential_notes?: string;
+  }) =>
+    request<{ message: string; review_submissions: ReviewSubmissionItem[] }>(`editor/manuscripts/${id}/structured-review`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

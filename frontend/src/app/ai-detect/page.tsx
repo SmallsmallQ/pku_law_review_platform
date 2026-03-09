@@ -6,6 +6,7 @@ import { Button, Card, Input, message, Select, Spin, Typography, Upload } from "
 import { CopyOutlined, FileWordOutlined, LinkOutlined } from "@ant-design/icons";
 import HeaderBar from "@/components/HeaderBar";
 import { useAuth } from "@/contexts/AuthContext";
+import { REVIEW_STAFF_ROLES } from "@/lib/constants";
 import { editorApi, manuscriptsApi, type ManuscriptListItem } from "@/services/api";
 
 const { Title, Text, Paragraph } = Typography;
@@ -63,7 +64,7 @@ export default function AIDetectPage() {
     const sourceType = source === "editor" ? "editor" : "author";
     const importKey = `${sourceType}:${sourceManuscriptId}`;
     if (autoImportedKey === importKey) return;
-    if (sourceType === "editor" && user.role !== "editor" && user.role !== "admin") return;
+    if (sourceType === "editor" && !REVIEW_STAFF_ROLES.includes(user.role as (typeof REVIEW_STAFF_ROLES)[number])) return;
 
     setAutoImportedKey(importKey);
     void importManuscriptText(sourceManuscriptId, sourceType);

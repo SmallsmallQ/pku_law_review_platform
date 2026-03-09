@@ -18,7 +18,7 @@ from app.core.review_workflow import REVIEW_STAGES, TERMINAL_STATUSES, next_flow
 from app.core.storage import resolve_path
 from app.services.docx_to_pdf import convert_to_pdf
 from app.db.base import get_db
-from app.models import CitationIssue, EditorAction, Manuscript, ManuscriptAssignment, ManuscriptVersion, User, ManuscriptParsed, ReviewReport, RevisionTemplate
+from app.models import CitationIssue, EditorAction, Manuscript, ManuscriptAssignment, ManuscriptVersion, ReviewSubmission, User, ManuscriptParsed, ReviewReport, RevisionTemplate
 from app.services.citation_checker import check_citations_with_llm
 from app.services.llm import chat_completion, is_llm_configured
 from app.services.review_service import generate_full_ai_report
@@ -94,6 +94,38 @@ def _serialize_actions(db: Session, manuscript_id: int) -> list[dict]:
     ]
 
 
+def _serialize_review_submissions(db: Session, manuscript_id: int) -> list[dict]:
+    submissions = (
+        db.query(ReviewSubmission, User)
+        .join(User, User.id == ReviewSubmission.reviewer_id)
+        .filter(ReviewSubmission.manuscript_id == manuscript_id)
+        .order_by(ReviewSubmission.updated_at.desc(), ReviewSubmission.id.desc())
+        .all()
+    )
+    return [
+        {
+            "id": submission.id,
+            "review_stage": submission.review_stage,
+            "reviewer_id": submission.reviewer_id,
+            "reviewer_name": reviewer.real_name or reviewer.email,
+            "reviewer_email": reviewer.email,
+            "reviewer_role": reviewer.role,
+            "recommendation": submission.recommendation,
+            "overall_score": submission.overall_score,
+            "originality_score": submission.originality_score,
+            "rigor_score": submission.rigor_score,
+            "writing_score": submission.writing_score,
+            "summary": submission.summary,
+            "major_issues": submission.major_issues,
+            "revision_requirements": submission.revision_requirements,
+            "confidential_notes": submission.confidential_notes,
+            "created_at": submission.created_at.isoformat() if submission.created_at else None,
+            "updated_at": submission.updated_at.isoformat() if submission.updated_at else None,
+        }
+        for submission, reviewer in submissions
+    ]
+
+
 def _get_manuscript_or_404(db: Session, manuscript_id: int) -> Manuscript:
     manuscript = db.query(Manuscript).filter(Manuscript.id == manuscript_id).first()
     if not manuscript:
@@ -145,6 +177,26 @@ def _available_actions_for_user(user: User, manuscript: Manuscript, assignments:
     if user.role in ("editor",) and current_stage == "final":
         actions.append("accept")
     return actions
+
+
+def _is_assigned_to_stage(user: User, assignments: list[dict], review_stage: str | None) -> bool:
+    if user.role == "admin":
+        return True
+    if not review_stage:
+        return False
+    return any(int(item.get("reviewer_id", 0)) == user.id and str(item.get("review_stage", "")) == review_stage for item in assignments)
+
+
+def _assert_stage_review_submitted(db: Session, manuscript_id: int, reviewer_id: int, review_stage: str | None) -> None:
+    if not review_stage:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="当前稿件未处于可提交评审意见的阶段")
+    exists = db.query(ReviewSubmission.id).filter(
+        ReviewSubmission.manuscript_id == manuscript_id,
+        ReviewSubmission.reviewer_id == reviewer_id,
+        ReviewSubmission.review_stage == review_stage,
+    ).first()
+    if not exists:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请先提交当前阶段的结构化审稿意见")
 
 
 class EditorManuscriptListItem(BaseModel):
@@ -311,6 +363,7 @@ def editor_manuscript_detail(
         "similarity_results": [],
         "assignments": assignments,
         "available_actions": _available_actions_for_user(user, m, assignments),
+        "review_submissions": _serialize_review_submissions(db, id),
         "editor_actions": _serialize_actions(db, id),
     }
 
@@ -381,6 +434,8 @@ def editor_action(
         expected_stage, flow_status, next_stage = flow
         if m.current_review_stage != expected_stage:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="当前审稿阶段与操作不匹配")
+        if user.role != "admin":
+            _assert_stage_review_submitted(db, id, user.id, expected_stage)
         to_status = flow_status
     elif body.action_type == "status_change" and body.to_status:
         if user.role != "admin":
@@ -424,6 +479,19 @@ class CitationCheckResponse(BaseModel):
     issues: list[dict]
 
 
+class StructuredReviewBody(BaseModel):
+    review_stage: str
+    recommendation: str
+    overall_score: int | None = None
+    originality_score: int | None = None
+    rigor_score: int | None = None
+    writing_score: int | None = None
+    summary: str | None = None
+    major_issues: str | None = None
+    revision_requirements: str | None = None
+    confidential_notes: str | None = None
+
+
 def _normalize_report_payload(report_obj: ReviewReport | None) -> tuple[str, str]:
     """标准化报告内容，避免 JSON 结构异常导致响应序列化报错；绝不抛异常。"""
     try:
@@ -449,6 +517,62 @@ def _normalize_report_payload(report_obj: ReviewReport | None) -> tuple[str, str
         return str(content or ""), str(model or settings.llm_model)
     except Exception:
         return "", settings.llm_model
+
+
+@router.post("/manuscripts/{id}/structured-review", response_model=dict)
+def submit_structured_review(
+    id: int,
+    body: StructuredReviewBody,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(RequireReviewStaff)],
+):
+    manuscript = _get_manuscript_or_404(db, id)
+    assignments = _serialize_assignments(db, [id]).get(id, [])
+    if not _can_access_manuscript(user, manuscript, assignments):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
+    if body.review_stage not in REVIEW_STAGES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="review_stage 不合法")
+    if body.recommendation not in {"accept", "minor_revision", "major_revision", "reject"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="recommendation 不合法")
+    if user.role != "admin" and manuscript.current_review_stage != body.review_stage:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="只能提交当前阶段的审稿意见")
+    if not _is_assigned_to_stage(user, assignments, body.review_stage):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="当前阶段未分配给你")
+
+    for score_name in ("overall_score", "originality_score", "rigor_score", "writing_score"):
+        score = getattr(body, score_name)
+        if score is not None and not (1 <= score <= 10):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="评分需在 1 到 10 之间")
+
+    submission = db.query(ReviewSubmission).filter(
+        ReviewSubmission.manuscript_id == id,
+        ReviewSubmission.reviewer_id == user.id,
+        ReviewSubmission.review_stage == body.review_stage,
+    ).first()
+    if not submission:
+        submission = ReviewSubmission(
+            manuscript_id=id,
+            reviewer_id=user.id,
+            review_stage=body.review_stage,
+            recommendation=body.recommendation,
+        )
+        _assign_sqlite_id(db, ReviewSubmission, submission)
+        db.add(submission)
+
+    submission.recommendation = body.recommendation
+    submission.overall_score = body.overall_score
+    submission.originality_score = body.originality_score
+    submission.rigor_score = body.rigor_score
+    submission.writing_score = body.writing_score
+    submission.summary = (body.summary or "").strip() or None
+    submission.major_issues = (body.major_issues or "").strip() or None
+    submission.revision_requirements = (body.revision_requirements or "").strip() or None
+    submission.confidential_notes = (body.confidential_notes or "").strip() or None
+    db.commit()
+    return {
+        "message": "ok",
+        "review_submissions": _serialize_review_submissions(db, id),
+    }
 
 
 @router.post("/manuscripts/{id}/citation-check", response_model=CitationCheckResponse)

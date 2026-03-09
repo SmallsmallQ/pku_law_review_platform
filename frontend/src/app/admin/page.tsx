@@ -11,19 +11,17 @@ import {
   type AdminStats,
   type AdminUserItem,
 } from "@/services/api";
-import { STATUS_MAP } from "@/lib/constants";
+import { ROLE_MAP, STATUS_MAP } from "@/lib/constants";
 
-const PENDING_STATUSES = new Set(["submitted", "parsing", "under_review", "revision_requested", "revised_submitted"]);
+const PENDING_STATUSES = new Set(["submitted", "parsing", "under_review", "internal_review", "external_review", "final_review", "revision_requested", "revised_submitted"]);
 const ACTION_TYPE_MAP: Record<string, string> = {
   revision_request: "退修",
   reject: "退稿",
   accept: "录用",
   status_change: "改状态",
-};
-const ROLE_MAP: Record<string, string> = {
-  author: "作者",
-  editor: "编辑",
-  admin: "管理员",
+  submit_internal_review: "内审通过",
+  submit_external_review: "外审通过",
+  submit_final_submission: "提交成稿",
 };
 
 export default function AdminDashboardPage() {
@@ -187,7 +185,7 @@ export default function AdminDashboardPage() {
       key: "/admin/users",
       title: "用户管理",
       desc: "新增、编辑、删除用户账号",
-      value: (stats?.users_by_role?.author ?? 0) + (stats?.users_by_role?.editor ?? 0) + (stats?.users_by_role?.admin ?? 0),
+      value: Object.values(stats?.users_by_role ?? {}).reduce((sum, count) => sum + count, 0),
       suffix: "用户",
     },
     {
@@ -264,7 +262,7 @@ export default function AdminDashboardPage() {
         </Col>
         <Col xs={24} sm={12} md={8}>
           <Card size="small" className="shadow-sm">
-            <Statistic title="编辑" value={stats.users_by_role?.editor ?? 0} />
+            <Statistic title="内审/外审/编辑" value={(stats.users_by_role?.internal_reviewer ?? 0) + (stats.users_by_role?.external_reviewer ?? 0) + (stats.users_by_role?.editor ?? 0)} />
           </Card>
         </Col>
       </Row>

@@ -353,7 +353,7 @@ export default function EditorWorkbenchPage() {
                     <div className="mb-2 text-sm font-medium text-[#333]">
                       AI 初审报告{aiReport.model ? `（${aiReport.model}）` : ""}
                     </div>
-                    <div className="h-[52vh] min-h-[320px] max-h-[560px] overflow-y-auto pr-1">
+                    <div className="min-h-[180px] max-h-[52vh] overflow-y-auto pr-1">
                       <TypewriterMarkdown content={aiReport.content} enabled={typewriterForReportId === selectedId} />
                     </div>
                   </div>
