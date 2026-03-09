@@ -49,6 +49,11 @@ export default function EditorManuscriptDetailPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const previewObjectUrlRef = useRef<string | null>(null);
+  /** Word 转 PDF 预览：后端生成 PDF 后的 blob URL */
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState("");
+  const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
+  const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null);
+  const pdfPreviewObjectUrlRef = useRef<string | null>(null);
   // AI 助手
   const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
   const [aiChatMessages, setAiChatMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
@@ -191,8 +196,41 @@ export default function EditorManuscriptDetailPage() {
         URL.revokeObjectURL(previewObjectUrlRef.current);
         previewObjectUrlRef.current = null;
       }
+      if (pdfPreviewObjectUrlRef.current) {
+        URL.revokeObjectURL(pdfPreviewObjectUrlRef.current);
+        pdfPreviewObjectUrlRef.current = null;
+      }
     };
   }, []);
+
+  /** 请求后端将当前版本 Word 转为 PDF 并返回，用于预览 */
+  const loadPdfPreview = useCallback(async () => {
+    if (!id || !currentVersion) return;
+    const versionId = Number(currentVersion.id);
+    setPdfPreviewError(null);
+    setPdfPreviewLoading(true);
+    if (pdfPreviewObjectUrlRef.current) {
+      URL.revokeObjectURL(pdfPreviewObjectUrlRef.current);
+      pdfPreviewObjectUrlRef.current = null;
+      setPdfPreviewUrl("");
+    }
+    try {
+      const url = editorApi.previewPdfUrl(Number(id), versionId);
+      const res = await fetch(url);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { detail?: string };
+        throw new Error(err.detail || "生成 PDF 失败");
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      pdfPreviewObjectUrlRef.current = objectUrl;
+      setPdfPreviewUrl(objectUrl);
+    } catch (e) {
+      setPdfPreviewError(e instanceof Error ? e.message : "生成 PDF 预览失败");
+    } finally {
+      setPdfPreviewLoading(false);
+    }
+  }, [id, currentVersion]);
 
   const manuscript = detail?.manuscript as Record<string, unknown> | undefined;
   const currentVersion = detail?.current_version as Record<string, unknown> | undefined;
@@ -314,216 +352,198 @@ export default function EditorManuscriptDetailPage() {
           )}
           {!loading && detail && manuscript && (
             <>
-              <Descriptions column={1} size="small" bordered className="mb-4">
-                <Descriptions.Item label="稿件编号">{String(manuscript.manuscript_no)}</Descriptions.Item>
-                <Descriptions.Item label="标题">{String(manuscript.title)}</Descriptions.Item>
-                <Descriptions.Item label="状态">
-                  <Tag color="default">{STATUS_MAP[status ?? ""] ?? status}</Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="投稿人 ID">{String(manuscript.submitted_by)}</Descriptions.Item>
-                {currentVersion && (
-                  <Descriptions.Item label="当前版本">
-                    <Space>
-                      <span>v{String(currentVersion.version_number)}，{String(currentVersion.file_name_original)}</span>
-                      <a href={editorApi.downloadUrl(Number(id), Number(currentVersion.id))} target="_blank" rel="noopener noreferrer">
-                        下载
-                      </a>
+              {/* 主布局：左侧信息与操作区，右侧稿件预览区 */}
+              <div className="grid grid-cols-1 xl:grid-cols-[380px_1fr] gap-6 xl:gap-8">
+                {/* 左侧：元数据 + 操作 + 引注 + AI 报告 + 操作记录 */}
+                <div className="flex flex-col gap-4 order-2 xl:order-1">
+                  <Card size="small" className="shadow-sm">
+                    <Descriptions column={1} size="small" bordered>
+                      <Descriptions.Item label="稿件编号">{String(manuscript.manuscript_no)}</Descriptions.Item>
+                      <Descriptions.Item label="标题">{String(manuscript.title)}</Descriptions.Item>
+                      <Descriptions.Item label="状态">
+                        <Tag color="default">{STATUS_MAP[status ?? ""] ?? status}</Tag>
+                      </Descriptions.Item>
+                      <Descriptions.Item label="投稿人 ID">{String(manuscript.submitted_by)}</Descriptions.Item>
+                      {currentVersion && (
+                        <Descriptions.Item label="当前版本">
+                          <Space>
+                            <span className="text-xs">v{String(currentVersion.version_number)}，{String(currentVersion.file_name_original)}</span>
+                            <a href={editorApi.downloadUrl(Number(id), Number(currentVersion.id))} target="_blank" rel="noopener noreferrer">
+                              下载
+                            </a>
+                          </Space>
+                        </Descriptions.Item>
+                      )}
+                    </Descriptions>
+                  </Card>
+                  {parsed && (
+                    <Card size="small" title="摘要与关键词" className="shadow-sm">
+                      <Typography.Paragraph className="!mb-1 text-sm" ellipsis={{ rows: 3, expandable: true }}>
+                        {String(parsed.abstract || "未识别")}
+                      </Typography.Paragraph>
+                      <Typography.Text type="secondary" className="text-xs">{String(parsed.keywords || "未识别")}</Typography.Text>
+                    </Card>
+                  )}
+                  <Card size="small" title="操作" className="shadow-sm">
+                    {aiReviewLoading && (
+                      <Alert message="正在生成 AI 初审报告…" type="info" showIcon className="mb-3 text-xs" />
+                    )}
+                    <Space wrap size="small">
+                      <Button type="primary" ghost size="small" onClick={runAiReview} loading={aiReviewLoading}>
+                        生成 AI 初审报告
+                      </Button>
+                      <Button type="default" size="small" onClick={() => setAiAssistantOpen(true)}>AI 助手</Button>
+                      {status !== "revision_requested" && status !== "rejected" && status !== "accepted" && (
+                        <Button size="small" onClick={() => { setRevisionModalOpen(true); setRevisionDraftError(null); }}>退修</Button>
+                      )}
+                      {status !== "rejected" && (
+                        <Button danger size="small" onClick={() => setRejectConfirmOpen(true)} disabled={actionLoading}>退稿</Button>
+                      )}
+                      {status !== "accepted" && (
+                        <Button type="primary" size="small" onClick={() => runAction("accept")} disabled={actionLoading}>录用</Button>
+                      )}
                     </Space>
-                  </Descriptions.Item>
-                )}
-              </Descriptions>
-              {parsed && (
-                <Card size="small" title="解析元数据" className="mb-4">
-                  <Descriptions column={1} size="small">
-                    <Descriptions.Item label="摘要">{String(parsed.abstract || "未识别")}</Descriptions.Item>
-                    <Descriptions.Item label="关键词">{String(parsed.keywords || "未识别")}</Descriptions.Item>
-                  </Descriptions>
-                </Card>
-              )}
-              <Card
-                size="small"
-                title="原始稿件"
-                className="mb-4"
-                extra={
-                  currentVersion ? (
-                    <a
-                      href={editorApi.downloadUrl(Number(id), Number(currentVersion.id))}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      下载原稿
-                    </a>
-                  ) : null
-                }
-              >
-                {!currentVersion ? (
-                  <Typography.Text type="secondary">当前稿件暂无可阅读版本。</Typography.Text>
-                ) : (
-                  <div className="space-y-3">
-                    <Typography.Text type="secondary" className="block text-xs">
-                      文件：{String(currentVersion.file_name_original || "未命名文件")}
-                    </Typography.Text>
-                    {previewLoading ? (
-                      <div className="flex items-center gap-3 py-6">
-                        <Spin />
-                        <Typography.Text type="secondary">正在加载原始稿件…</Typography.Text>
-                      </div>
-                    ) : null}
-                    {previewError ? <Alert message={previewError} type="warning" showIcon /> : null}
-                    {!previewLoading && previewType === "pdf" && previewUrl ? (
-                      <iframe
-                        src={previewUrl}
-                        title="原始稿件 PDF 预览"
-                        className="h-[70vh] min-h-[520px] w-full border border-[#dedee3] bg-white"
-                      />
-                    ) : null}
-                    {!previewLoading && previewType === "docx" ? (
-                      <div className="max-h-[70vh] min-h-[520px] overflow-y-auto border border-[#dedee3] bg-white p-5 text-sm leading-8 text-[#2c2c2e]">
-                        {docxPreviewText ? (
-                          <pre className="whitespace-pre-wrap font-sans">{docxPreviewText}</pre>
-                        ) : (
-                          <Typography.Text type="secondary">DOCX 暂无可显示文本，建议下载原稿查看版式。</Typography.Text>
+                  </Card>
+                  {aiError && <Alert message={aiError} type="error" showIcon />}
+                  <Card size="small" title="引注检查" className="shadow-sm">
+                    <Space wrap className="mb-2" align="center" size="small">
+                      <Button type="default" size="small" onClick={runCitationCheck} loading={citationCheckLoading}>
+                        {citationCheckLoading ? "检查中…" : "运行引注检查"}
+                      </Button>
+                      <label className="flex items-center gap-1 cursor-pointer text-xs text-gray-600">
+                        <input type="checkbox" checked={citationCheckUseLlm} onChange={(e) => setCitationCheckUseLlm(e.target.checked)} className="rounded border-gray-300" />
+                        使用大模型辅助
+                      </label>
+                    </Space>
+                    {citationCheckError && <Alert message={citationCheckError} type="error" showIcon className="mb-2" />}
+                    {citationIssues.length > 0 ? (
+                      <Typography.Text strong className="text-xs">发现 {citationIssues.length} 处引注问题</Typography.Text>
+                    ) : !citationCheckLoading && (
+                      <Typography.Text type="secondary" className="text-xs">运行后显示结果</Typography.Text>
+                    )}
+                    {citationIssues.length > 0 && (
+                      <List
+                        size="small"
+                        dataSource={citationIssues}
+                        className="mt-2 max-h-[200px] overflow-y-auto"
+                        renderItem={(item) => (
+                          <List.Item className="!px-0">
+                            <Typography.Text strong className="text-xs">[{item.location}]</Typography.Text>
+                            <Typography.Text className="text-xs ml-1">{item.description}</Typography.Text>
+                          </List.Item>
                         )}
-                      </div>
-                    ) : null}
-                    {!previewLoading && previewType === "doc" ? (
-                      <Alert
-                        message="当前为 .doc 文件。浏览器端暂不支持稳定在线预览，建议直接下载原稿查看。"
-                        type="info"
-                        showIcon
                       />
-                    ) : null}
-                  </div>
-                )}
-              </Card>
-              <Card size="small" title="引注检查" className="mb-4">
-                <Typography.Paragraph type="secondary" className="text-sm mb-3">
-                  依据《法学引注手册（第二版）》自动检查脚注格式、文献要素（出版社、页码）、法条与案例引用规范。链接、网页、公众号等非正式文献不强制要求页码。
-                </Typography.Paragraph>
-                <Space wrap className="mb-2" align="center">
-                  <Button
-                    type="default"
-                    onClick={runCitationCheck}
-                    loading={citationCheckLoading}
-                  >
-                    {citationCheckLoading ? "检查中…" : "运行引注检查"}
-                  </Button>
-                  <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600">
-                    <input
-                      type="checkbox"
-                      checked={citationCheckUseLlm}
-                      onChange={(e) => setCitationCheckUseLlm(e.target.checked)}
-                      className="rounded border-gray-300"
-                    />
-                    使用大模型辅助判断
-                  </label>
-                </Space>
-                {citationCheckError && (
-                  <Alert message={citationCheckError} type="error" showIcon className="mb-2" />
-                )}
-                {citationIssues.length > 0 && (
-                  <div className="mt-3">
-                    <Typography.Text strong className="block mb-2">
-                      发现 {citationIssues.length} 处引注问题
-                    </Typography.Text>
-                    <List
+                    )}
+                  </Card>
+                  {aiReport && (
+                    <Card
                       size="small"
-                      dataSource={citationIssues}
-                      renderItem={(item) => (
-                        <List.Item>
-                          <div>
-                            <Typography.Text strong>[{item.location}]</Typography.Text>
-                            <Typography.Text className="ml-2">{item.description}</Typography.Text>
-                            {item.suggestion && (
-                              <div className="mt-1 text-gray-500 text-sm">{item.suggestion}</div>
+                      title="AI 初审报告"
+                      className="shadow-sm"
+                      extra={<Button type="link" size="small" onClick={copyReport}>复制</Button>}
+                    >
+                      <div className="max-h-[280px] overflow-y-auto pr-1 text-xs">
+                        <TypewriterMarkdown content={aiReport.content} enabled={reportJustGenerated} />
+                      </div>
+                    </Card>
+                  )}
+                  {editorActions.length > 0 && (
+                    <Card size="small" title="操作记录" className="shadow-sm">
+                      <List
+                        size="small"
+                        dataSource={editorActions.slice(0, 5)}
+                        renderItem={(a) => (
+                          <List.Item className="!px-0">
+                            <span className="text-xs">{String(a.action_type)} → {String(a.to_status)}</span>
+                            <Typography.Text type="secondary" className="text-xs block">{String(a.created_at ?? "").slice(0, 16)}</Typography.Text>
+                          </List.Item>
+                        )}
+                      />
+                      {editorActions.length > 5 && (
+                        <Typography.Text type="secondary" className="text-xs">共 {editorActions.length} 条</Typography.Text>
+                      )}
+                    </Card>
+                  )}
+                  <Link href="/editor"><Button type="link" size="small" className="!px-0">返回列表</Button></Link>
+                </div>
+
+                {/* 右侧：稿件预览（主视觉区域） */}
+                <div className="order-1 xl:order-2 min-h-[560px]">
+                  <Card
+                    size="small"
+                    title="原始稿件"
+                    className="h-full shadow-sm"
+                    extra={
+                      currentVersion ? (
+                        <a href={editorApi.downloadUrl(Number(id), Number(currentVersion.id))} target="_blank" rel="noopener noreferrer" className="text-xs">
+                          下载原稿
+                        </a>
+                      ) : null
+                    }
+                  >
+                    {!currentVersion ? (
+                      <Typography.Text type="secondary">当前稿件暂无可阅读版本。</Typography.Text>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        <Typography.Text type="secondary" className="text-xs">
+                          文件：{String(currentVersion.file_name_original || "未命名文件")}
+                          {(previewType === "docx" || previewType === "doc") && (
+                            <span className="ml-2">
+                              （可优先使用「PDF 预览」查看版式）
+                            </span>
+                          )}
+                        </Typography.Text>
+                        {previewLoading ? (
+                          <div className="flex items-center gap-3 py-12">
+                            <Spin />
+                            <Typography.Text type="secondary">正在加载预览…</Typography.Text>
+                          </div>
+                        ) : null}
+                        {previewError ? <Alert message={previewError} type="warning" showIcon /> : null}
+                        {!previewLoading && previewType === "pdf" && previewUrl ? (
+                          <iframe
+                            src={previewUrl}
+                            title="原始稿件 PDF 预览"
+                            className="h-[75vh] min-h-[520px] w-full rounded border border-[#e8e8e8] bg-white"
+                          />
+                        ) : null}
+                        {!previewLoading && (previewType === "docx" || previewType === "doc") && pdfPreviewUrl ? (
+                          <iframe
+                            src={pdfPreviewUrl}
+                            title="Word 转 PDF 预览"
+                            className="h-[75vh] min-h-[520px] w-full rounded border border-[#e8e8e8] bg-white"
+                          />
+                        ) : null}
+                        {!previewLoading && (previewType === "docx" || previewType === "doc") && !pdfPreviewUrl && (
+                          <div className="space-y-2">
+                            <Button
+                              type="primary"
+                              size="small"
+                              onClick={loadPdfPreview}
+                              loading={pdfPreviewLoading}
+                            >
+                              {pdfPreviewLoading ? "正在生成 PDF…" : "转为 PDF 预览"}
+                            </Button>
+                            {pdfPreviewError && <Alert message={pdfPreviewError} type="warning" showIcon />}
+                            {previewType === "docx" && (
+                              <div className="max-h-[60vh] min-h-[320px] overflow-y-auto border border-[#e8e8e8] rounded bg-white p-4 text-sm leading-7 text-[#2c2c2e]">
+                                {docxPreviewText ? (
+                                  <pre className="whitespace-pre-wrap font-sans">{docxPreviewText}</pre>
+                                ) : (
+                                  <Typography.Text type="secondary">暂无文本预览，请点击「转为 PDF 预览」或下载原稿查看。</Typography.Text>
+                                )}
+                              </div>
+                            )}
+                            {previewType === "doc" && !docxPreviewText && (
+                              <Typography.Text type="secondary">.doc 格式可尝试「转为 PDF 预览」（需服务器安装 LibreOffice），或下载原稿查看。</Typography.Text>
                             )}
                           </div>
-                        </List.Item>
-                      )}
-                    />
-                  </div>
-                )}
-                {!citationCheckLoading && citationIssues.length === 0 && (
-                  <Typography.Text type="secondary" className="text-sm">运行检查后将在此显示脚注、文献、法条与案例引用中的问题；若无问题则显示「发现 0 处引注问题」。</Typography.Text>
-                )}
-              </Card>
-              <Card size="small" title="操作" className="mb-4">
-                {aiReviewLoading && (
-                  <Alert message="正在生成 AI 初审报告，预计需要 10–30 秒，请稍候。" type="info" showIcon className="mb-3" />
-                )}
-                <Space wrap>
-                  <Button
-                    type="primary"
-                    ghost
-                    onClick={runAiReview}
-                    loading={aiReviewLoading}
-                  >
-                    {aiReviewLoading ? "生成中…" : "生成 AI 初审报告"}
-                  </Button>
-                  <Button type="default" onClick={() => setAiAssistantOpen(true)}>
-                    AI 助手
-                  </Button>
-                  {status !== "revision_requested" && status !== "rejected" && status !== "accepted" && (
-                    <Button onClick={() => { setRevisionModalOpen(true); setRevisionDraftError(null); }}>退修</Button>
-                  )}
-                  {status !== "rejected" && (
-                    <Button danger onClick={() => setRejectConfirmOpen(true)} disabled={actionLoading}>
-                      退稿
-                    </Button>
-                  )}
-                  {status !== "accepted" && (
-                    <Button type="primary" onClick={() => runAction("accept")} disabled={actionLoading}>
-                      录用
-                    </Button>
-                  )}
-                </Space>
-              </Card>
-              {aiError && (
-                <Alert message={aiError} type="error" showIcon className="mb-4" />
-              )}
-              {aiReport && (
-                <Card
-                  size="small"
-                  title="AI 初审报告"
-                  className="mb-4"
-                  extra={
-                    <Button type="link" size="small" onClick={copyReport}>
-                      复制报告
-                    </Button>
-                  }
-                >
-                  <Typography.Text type="secondary" className="text-xs block mb-2">
-                    模型：{aiReport.model}
-                  </Typography.Text>
-                  <div className="h-[52vh] min-h-[320px] max-h-[560px] overflow-y-auto pr-1">
-                    <TypewriterMarkdown content={aiReport.content} enabled={reportJustGenerated} />
-                  </div>
-                </Card>
-              )}
-              {editorActions.length > 0 && (
-                <Card size="small" title="操作记录" className="mb-4">
-                  <List
-                    size="small"
-                    dataSource={editorActions}
-                    renderItem={(a, i) => (
-                      <List.Item>
-                        <div>
-                          <p className="mb-0">{String(a.action_type)}：{String(a.from_status)} → {String(a.to_status)}</p>
-                          {a.comment != null && (
-                            <div className="mt-1 rounded bg-[#fafafa] px-3 py-2">
-                              <MarkdownRenderer content={String(a.comment)} />
-                            </div>
-                          )}
-                          <Typography.Text type="secondary" className="text-xs block mt-1">{String(a.created_at ?? "").slice(0, 19)}</Typography.Text>
-                        </div>
-                      </List.Item>
+                        ) : null}
+                      </div>
                     )}
-                  />
-                </Card>
-              )}
-              <Link href="/editor">
-                <Button type="link" className="!px-0">返回列表</Button>
-              </Link>
+                  </Card>
+                </div>
+              </div>
             </>
           )}
         </Card>

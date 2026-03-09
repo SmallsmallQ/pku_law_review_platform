@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.deps import RequireEditor, get_current_user, get_current_user_for_download
 from app.core.storage import resolve_path
+from app.services.docx_to_pdf import convert_to_pdf
 from app.db.base import get_db
 from app.models import CitationIssue, EditorAction, Manuscript, ManuscriptVersion, User, ManuscriptParsed, ReviewReport, RevisionTemplate
 from app.services.citation_checker import check_citations_with_llm
@@ -516,14 +517,8 @@ def editor_revision_draft(
     return RevisionDraftResponse(draft=draft)
 
 
-@router.get("/manuscripts/{id}/files/{version_id}/download")
-def editor_download_file(
-    id: int,
-    version_id: int,
-    db: Annotated[Session, Depends(get_db)],
-    user: Annotated[User, Depends(get_current_user_for_download)],
-):
-    """编辑下载稿件某版本主稿文件。支持 Authorization 或 ?token= 鉴权；需为 editor/admin 角色。"""
+def _get_editor_version_path(id: int, version_id: int, db: Session, user: User):
+    """校验权限并返回稿件版本的本地文件路径。"""
     if user.role not in ("editor", "admin"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
     m = db.query(Manuscript).filter(Manuscript.id == id).first()
@@ -535,4 +530,49 @@ def editor_download_file(
     path = resolve_path(v.file_path)
     if not path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件不存在")
-    return FileResponse(path, filename=v.file_name_original or "manuscript.pdf")
+    return path, v.file_name_original or "manuscript.pdf"
+
+
+@router.get("/manuscripts/{id}/files/{version_id}/download")
+def editor_download_file(
+    id: int,
+    version_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user_for_download)],
+):
+    """编辑下载稿件某版本主稿文件。支持 Authorization 或 ?token= 鉴权；需为 editor/admin 角色。"""
+    path, filename = _get_editor_version_path(id, version_id, db, user)
+    return FileResponse(path, filename=filename)
+
+
+@router.get("/manuscripts/{id}/files/{version_id}/preview-pdf")
+def editor_preview_pdf(
+    id: int,
+    version_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user_for_download)],
+):
+    """
+    预览用 PDF：若当前版本已是 PDF 则直接返回；若为 .docx/.doc 则用 LibreOffice 转为 PDF 后返回。
+    服务器未安装 LibreOffice 时，对 Word 文件返回 503，前端可降级为文本预览或下载原稿。
+    """
+    path, filename = _get_editor_version_path(id, version_id, db, user)
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        return FileResponse(path, filename=filename, media_type="application/pdf")
+    if suffix in (".docx", ".doc"):
+        pdf_path = convert_to_pdf(path)
+        if pdf_path is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Word 转 PDF 不可用（请确认服务器已安装 LibreOffice），请下载原稿查看。",
+            )
+        try:
+            content = pdf_path.read_bytes()
+            return Response(content=content, media_type="application/pdf")
+        finally:
+            try:
+                pdf_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该格式不支持预览为 PDF")

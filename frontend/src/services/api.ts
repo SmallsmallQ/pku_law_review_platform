@@ -205,6 +205,9 @@ export const editorApi = {
     }),
   downloadUrl: (id: number, versionId: number) =>
     `${API_BASE}/editor/manuscripts/${id}/files/${versionId}/download${getToken() ? `?token=${getToken()}` : ""}`,
+  /** Word 转 PDF 预览：返回 PDF 文件流，仅对 .docx/.doc 有效；PDF 原稿请用 download */
+  previewPdfUrl: (id: number, versionId: number) =>
+    `${API_BASE}/editor/manuscripts/${id}/files/${versionId}/preview-pdf${getToken() ? `?token=${getToken()}` : ""}`,
   /** 生成 AI 初审报告 */
   generateAiReview: (id: number) =>
     request<{ content: string; model: string }>(`editor/manuscripts/${id}/ai-review`, { method: "POST" }),
