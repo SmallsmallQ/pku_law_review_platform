@@ -204,7 +204,7 @@ export default function EditorManuscriptDetailPage() {
   const currentVersion = detail?.current_version as Record<string, unknown> | undefined;
   const parsed = detail?.parsed as Record<string, unknown> | undefined;
   const editorActions = (detail?.editor_actions as Record<string, unknown>[]) || [];
-  const assignments = (detail?.assignments as Array<Record<string, unknown>>) || [];
+  const assignments = (detail?.assignments as unknown as Array<Record<string, unknown>>) || [];
   const availableActions = (detail?.available_actions as string[]) || [];
   const reviewSubmissions = (detail?.review_submissions as ReviewSubmissionItem[]) || [];
   const citationIssues = (detail?.citation_issues as Array<{ location: string; description: string; suggestion?: string }>) || [];
