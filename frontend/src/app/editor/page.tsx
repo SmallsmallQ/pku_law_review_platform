@@ -27,6 +27,7 @@ import { REVIEW_STAGE_MAP, REVIEW_STAFF_ROLES, ROLE_MAP, STATUS_MAP } from "@/li
 import { editorApi, type EditorManuscriptDetail, type EditorManuscriptItem } from "@/services/api";
 
 const { TextArea } = Input;
+const { Paragraph, Text, Title } = Typography;
 
 export default function EditorWorkbenchPage() {
   const { user, loading: authLoading } = useAuth();
@@ -206,10 +207,40 @@ export default function EditorWorkbenchPage() {
   return (
     <div className="bg-[#f5f6f8]">
       <HeaderBar />
-      <main className="w-full px-5 py-6 sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(420px,1fr)_380px]">
+      <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <Space direction="vertical" size={24} className="flex w-full">
+          <Card styles={{ body: { padding: 28 } }}>
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-center">
+              <div>
+                <Text className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8B1538]">
+                  Editorial Workbench
+                </Text>
+                <Title level={2} className="!mb-2 !mt-3 !text-[#1f2937]">
+                  编辑工作台
+                </Title>
+                <Paragraph className="!mb-0 !max-w-3xl !text-[15px] !leading-8 !text-[#667085]">
+                  左侧筛选稿件，中间处理退修与 AI 报告，右侧查看稿件流程与基础信息。保留原有审稿动作，只统一到新的 Ant Design 控制台风格。
+                </Paragraph>
+              </div>
+              <Card size="small" styles={{ body: { padding: 20 } }}>
+                <Descriptions
+                  column={1}
+                  size="small"
+                  items={[
+                    { key: "count", label: "当前列表数", children: `${list.length} 篇` },
+                    { key: "selected", label: "当前选中稿件", children: selectedId ? `${selectedId}` : "未选择" },
+                    { key: "filter", label: "状态筛选", children: statusFilter ? STATUS_MAP[statusFilter] ?? statusFilter : "全部" },
+                  ]}
+                />
+                <div className="mt-4">
+                  <Button onClick={loadList}>刷新列表</Button>
+                </div>
+              </Card>
+            </div>
+          </Card>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(420px,1fr)_380px]">
           <Card
-            size="small"
             title="待审稿件"
             extra={
               <Button size="small" onClick={loadList}>
@@ -244,7 +275,7 @@ export default function EditorWorkbenchPage() {
                 locale={{ emptyText: <Empty description="暂无稿件" /> }}
                 renderItem={(item) => (
                   <List.Item
-                    className={`cursor-pointer rounded px-2 ${selectedId === item.id ? "bg-[#f6eef1]" : "hover:bg-[#fafafa]"}`}
+                    className={`cursor-pointer rounded px-2 ${selectedId === item.id ? "bg-[#f6eef1]" : "bg-transparent"}`}
                     onClick={() => setSelectedId(item.id)}
                   >
                     <div className="w-full">
@@ -263,154 +294,155 @@ export default function EditorWorkbenchPage() {
             )}
           </Card>
 
-          <Card size="small" title="审稿意见与操作" className="h-full [&_.ant-card-body]:h-full">
+          <Card title="审稿意见与操作" className="h-full [&_.ant-card-body]:h-full">
             {!selectedId ? (
               <Empty description="请先在左侧选择稿件" />
             ) : loadingDetail ? (
               <div className="py-16 text-center">
                 <Spin />
               </div>
-            ) : (
-              <div className="flex h-full flex-col gap-4">
-                <div className="rounded border border-[#ececec] p-3">
-                  <div className="text-sm text-[#666] mb-1">当前稿件</div>
-                  <div className="font-medium text-[#333]">{String(manuscript?.title ?? "—")}</div>
-                  <div className="text-xs text-[#888] mt-1">{String(manuscript?.manuscript_no ?? "")}</div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {currentStage ? <Tag color="blue">{REVIEW_STAGE_MAP[currentStage] ?? currentStage}</Tag> : null}
-                    {assignments.map((item) => (
-                      <Tag key={item.id}>
-                        {REVIEW_STAGE_MAP[item.review_stage] ?? item.review_stage}：{item.reviewer_name}
-                      </Tag>
-                    ))}
-                  </div>
-                </div>
+                ) : (
+                  <div className="flex h-full flex-col gap-4">
+                    <Card size="small" styles={{ body: { padding: 18 } }}>
+                      <div className="text-sm text-[#666] mb-1">当前稿件</div>
+                      <div className="font-medium text-[#333]">{String(manuscript?.title ?? "—")}</div>
+                      <div className="text-xs text-[#888] mt-1">{String(manuscript?.manuscript_no ?? "")}</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {currentStage ? <Tag color="blue">{REVIEW_STAGE_MAP[currentStage] ?? currentStage}</Tag> : null}
+                        {assignments.map((item) => (
+                          <Tag key={item.id}>
+                            {REVIEW_STAGE_MAP[item.review_stage] ?? item.review_stage}：{item.reviewer_name}
+                          </Tag>
+                        ))}
+                      </div>
+                    </Card>
 
-                {availableActions.includes("revision_request") && (
-                  <>
-                    <div className="mb-1">
-                      <Button
-                        type="dashed"
-                        size="small"
-                        onClick={runRevisionDraft}
-                        loading={revisionDraftLoading}
-                      >
-                        {revisionDraftLoading ? "生成中…" : "AI 生成退修意见草稿"}
-                      </Button>
-                      {revisionDraftError && (
-                        <Typography.Text type="danger" className="ml-2 text-sm">{revisionDraftError}</Typography.Text>
-                      )}
-                    </div>
-                    <TextArea
-                      rows={6}
-                      value={revisionComment}
-                      onChange={(e) => setRevisionComment(e.target.value)}
-                      placeholder="在此填写退修意见（点击“提交退修”时发送给作者）"
-                    />
-                  </>
-                )}
-
-                <Space wrap>
-                  {availableActions.includes("revision_request") && (
-                    <Button onClick={() => runAction("revision_request")} loading={actionLoading}>
-                      提交退修
-                    </Button>
-                  )}
-                  {availableActions.includes("reject") && (
-                    <Button danger onClick={() => runAction("reject")} loading={actionLoading}>
-                      退稿
-                    </Button>
-                  )}
-                  {availableActions.includes("submit_internal_review") && (
-                    <Button type="primary" className="!bg-[#8B1538] hover:!bg-[#70122e]" onClick={() => runAction("submit_internal_review")} loading={actionLoading}>
-                      提交内审
-                    </Button>
-                  )}
-                  {availableActions.includes("submit_external_review") && (
-                    <Button type="primary" className="!bg-[#8B1538] hover:!bg-[#70122e]" onClick={() => runAction("submit_external_review")} loading={actionLoading}>
-                      提交外审
-                    </Button>
-                  )}
-                  {availableActions.includes("submit_final_submission") && (
-                    <Button type="primary" className="!bg-[#8B1538] hover:!bg-[#70122e]" onClick={() => runAction("submit_final_submission")} loading={actionLoading}>
-                      提交成稿
-                    </Button>
-                  )}
-                  {availableActions.includes("accept") && (
-                    <Button type="primary" className="!bg-[#8B1538] hover:!bg-[#70122e]" onClick={() => runAction("accept")} loading={actionLoading}>
-                      录用
-                    </Button>
-                  )}
-                  <Button type="dashed" onClick={runAiReview} loading={aiReviewLoading}>
-                    生成 AI 初审报告
-                  </Button>
-                  <Link href={`/editor/${selectedId}`}>打开完整详情页</Link>
-                </Space>
-
-                {aiError ? <Alert type="error" showIcon message={aiError} /> : null}
-                {aiReport ? (
-                  <div className="flex min-h-0 flex-1 flex-col rounded border border-[#ececec] p-3 overflow-hidden">
-                    <div className="mb-2 text-sm font-medium text-[#333]">
-                      AI 初审报告{aiReport.model ? `（${aiReport.model}）` : ""}
-                    </div>
-                    <div className="min-h-[260px] flex-1 overflow-y-auto pr-1">
-                      <TypewriterMarkdown content={aiReport.content} enabled={typewriterForReportId === selectedId} />
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            )}
-          </Card>
-
-          <Card size="small" title="流程与详情">
-            {!selectedId ? (
-              <Empty description="请先在左侧选择稿件" />
-            ) : loadingDetail ? (
-              <div className="py-16 text-center">
-                <Spin />
-              </div>
-            ) : (
-              <Space direction="vertical" className="w-full" size="middle">
-                <Descriptions column={1} size="small" bordered>
-                  <Descriptions.Item label="稿件编号">{String(manuscript?.manuscript_no ?? "—")}</Descriptions.Item>
-                  <Descriptions.Item label="状态">
-                    <Tag>{STATUS_MAP[status ?? ""] ?? status}</Tag>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="当前阶段">
-                    {currentStage ? <Tag color="blue">{REVIEW_STAGE_MAP[currentStage] ?? currentStage}</Tag> : "—"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="投稿人">{String(manuscript?.submitted_by ?? "—")}</Descriptions.Item>
-                  <Descriptions.Item label="审稿分配">
-                    {assignments.length > 0 ? assignments.map((item) => `${REVIEW_STAGE_MAP[item.review_stage] ?? item.review_stage}: ${item.reviewer_name}${item.reviewer_role ? `（${ROLE_MAP[item.reviewer_role] ?? item.reviewer_role}）` : ""}`).join("；") : "—"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="当前版本">
-                    {currentVersion ? (
-                      <Space>
-                        <span>
-                          v{String(currentVersion.version_number)} / {String(currentVersion.file_name_original ?? "")}
-                        </span>
-                        <a href={editorApi.downloadUrl(selectedId, Number(currentVersion.id))} target="_blank" rel="noopener noreferrer">
-                          下载
-                        </a>
-                      </Space>
-                    ) : (
-                      "—"
+                    {availableActions.includes("revision_request") && (
+                      <>
+                        <div className="mb-1">
+                          <Button
+                            type="dashed"
+                            size="small"
+                            onClick={runRevisionDraft}
+                            loading={revisionDraftLoading}
+                          >
+                            {revisionDraftLoading ? "生成中…" : "AI 生成退修意见草稿"}
+                          </Button>
+                          {revisionDraftError && (
+                            <Typography.Text type="danger" className="ml-2 text-sm">{revisionDraftError}</Typography.Text>
+                          )}
+                        </div>
+                        <TextArea
+                          rows={6}
+                          value={revisionComment}
+                          onChange={(e) => setRevisionComment(e.target.value)}
+                          placeholder="在此填写退修意见（点击“提交退修”时发送给作者）"
+                        />
+                      </>
                     )}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="解析摘要">{String(parsed?.abstract || "未识别")}</Descriptions.Item>
-                  <Descriptions.Item label="关键词">{String(parsed?.keywords || "未识别")}</Descriptions.Item>
-                </Descriptions>
 
-                <div>
-                  <Typography.Title level={5} className="!mb-3">
-                    流程记录
-                  </Typography.Title>
-                  {timelineItems.length ? <Timeline items={timelineItems} /> : <Empty description="暂无操作记录" />}
-                </div>
-              </Space>
-            )}
-          </Card>
-        </div>
+                    <Space wrap>
+                      {availableActions.includes("revision_request") && (
+                        <Button onClick={() => runAction("revision_request")} loading={actionLoading}>
+                          提交退修
+                        </Button>
+                      )}
+                      {availableActions.includes("reject") && (
+                        <Button danger onClick={() => runAction("reject")} loading={actionLoading}>
+                          退稿
+                        </Button>
+                      )}
+                      {availableActions.includes("submit_internal_review") && (
+                        <Button type="primary" onClick={() => runAction("submit_internal_review")} loading={actionLoading}>
+                          提交内审
+                        </Button>
+                      )}
+                      {availableActions.includes("submit_external_review") && (
+                        <Button type="primary" onClick={() => runAction("submit_external_review")} loading={actionLoading}>
+                          提交外审
+                        </Button>
+                      )}
+                      {availableActions.includes("submit_final_submission") && (
+                        <Button type="primary" onClick={() => runAction("submit_final_submission")} loading={actionLoading}>
+                          提交成稿
+                        </Button>
+                      )}
+                      {availableActions.includes("accept") && (
+                        <Button type="primary" onClick={() => runAction("accept")} loading={actionLoading}>
+                          录用
+                        </Button>
+                      )}
+                      <Button type="dashed" onClick={runAiReview} loading={aiReviewLoading}>
+                        生成 AI 初审报告
+                      </Button>
+                      <Link href={`/editor/${selectedId}`}>打开完整详情页</Link>
+                    </Space>
+
+                    {aiError ? <Alert type="error" showIcon message={aiError} /> : null}
+                    {aiReport ? (
+                      <Card size="small" className="min-h-0 flex-1" styles={{ body: { padding: 18 } }}>
+                        <div className="mb-2 text-sm font-medium text-[#333]">
+                          AI 初审报告{aiReport.model ? `（${aiReport.model}）` : ""}
+                        </div>
+                        <div className="min-h-[260px] overflow-y-auto pr-1">
+                          <TypewriterMarkdown content={aiReport.content} enabled={typewriterForReportId === selectedId} />
+                        </div>
+                      </Card>
+                    ) : null}
+                  </div>
+                )}
+              </Card>
+
+              <Card title="流程与详情">
+                {!selectedId ? (
+                  <Empty description="请先在左侧选择稿件" />
+                ) : loadingDetail ? (
+                  <div className="py-16 text-center">
+                    <Spin />
+                  </div>
+                ) : (
+                  <Space direction="vertical" className="w-full" size="middle">
+                    <Descriptions column={1} size="small" bordered>
+                      <Descriptions.Item label="稿件编号">{String(manuscript?.manuscript_no ?? "—")}</Descriptions.Item>
+                      <Descriptions.Item label="状态">
+                        <Tag>{STATUS_MAP[status ?? ""] ?? status}</Tag>
+                      </Descriptions.Item>
+                      <Descriptions.Item label="当前阶段">
+                        {currentStage ? <Tag color="blue">{REVIEW_STAGE_MAP[currentStage] ?? currentStage}</Tag> : "—"}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="投稿人">{String(manuscript?.submitted_by ?? "—")}</Descriptions.Item>
+                      <Descriptions.Item label="审稿分配">
+                        {assignments.length > 0 ? assignments.map((item) => `${REVIEW_STAGE_MAP[item.review_stage] ?? item.review_stage}: ${item.reviewer_name}${item.reviewer_role ? `（${ROLE_MAP[item.reviewer_role] ?? item.reviewer_role}）` : ""}`).join("；") : "—"}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="当前版本">
+                        {currentVersion ? (
+                          <Space>
+                            <span>
+                              v{String(currentVersion.version_number)} / {String(currentVersion.file_name_original ?? "")}
+                            </span>
+                            <a href={editorApi.downloadUrl(selectedId, Number(currentVersion.id))} target="_blank" rel="noopener noreferrer">
+                              下载
+                            </a>
+                          </Space>
+                        ) : (
+                          "—"
+                        )}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="解析摘要">{String(parsed?.abstract || "未识别")}</Descriptions.Item>
+                      <Descriptions.Item label="关键词">{String(parsed?.keywords || "未识别")}</Descriptions.Item>
+                    </Descriptions>
+
+                    <div>
+                      <Title level={5} className="!mb-3">
+                        流程记录
+                      </Title>
+                      {timelineItems.length ? <Timeline items={timelineItems} /> : <Empty description="暂无操作记录" />}
+                    </div>
+                  </Space>
+                )}
+              </Card>
+          </div>
+        </Space>
       </main>
     </div>
   );

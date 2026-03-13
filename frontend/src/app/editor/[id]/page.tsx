@@ -8,12 +8,14 @@ import {
   Breadcrumb,
   Button,
   Card,
+  Col,
   Descriptions,
   Drawer,
   Input,
   InputNumber,
   List,
   Modal,
+  Row,
   Select,
   Space,
   Spin,
@@ -33,6 +35,8 @@ const REVIEW_RECOMMENDATION_MAP: Record<string, string> = {
   major_revision: "建议大修",
   reject: "建议退稿",
 };
+
+const { Paragraph, Text, Title } = Typography;
 
 export default function EditorManuscriptDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -391,179 +395,281 @@ export default function EditorManuscriptDetailPage() {
   ];
 
   return (
-    <div className="bg-[#f5f6f8]">
+    <div className="bg-[#f4f6f8]">
       <HeaderBar />
-      <main className="w-full px-5 py-8 sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
-        <Card>
-          <Breadcrumb items={breadcrumbItems} className="mb-4" />
-          <Typography.Title level={5} className="!mb-4">
-            稿件详情（编辑）
-          </Typography.Title>
-          {successMessage && (
-            <Alert message={successMessage} type="success" showIcon className="mb-4" />
-          )}
+      <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <Space direction="vertical" size={24} className="flex w-full">
+          <Card styles={{ body: { padding: 28 } }}>
+            <Breadcrumb items={breadcrumbItems} className="mb-4" />
+            <Row gutter={[24, 24]} align="middle">
+              <Col xs={24} xl={16}>
+                <Text className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8B1538]">
+                  Editorial Review
+                </Text>
+                <Title level={2} className="!mb-2 !mt-3 !text-[#1f2937]">
+                  稿件详情（编辑）
+                </Title>
+                <Paragraph className="!mb-0 !max-w-3xl !text-[15px] !leading-8 !text-[#667085]">
+                  在同一工作台里查看稿件元数据、审稿意见、AI 报告和原稿预览，并继续推进内审、外审、退修或录用流程。
+                </Paragraph>
+              </Col>
+              <Col xs={24} xl={8}>
+                <Card size="small" styles={{ body: { padding: 20 } }}>
+                  <Descriptions
+                    column={1}
+                    size="small"
+                    items={[
+                      { key: "no", label: "稿件编号", children: manuscriptNo || "加载中" },
+                      { key: "status", label: "当前状态", children: status ? <Tag>{STATUS_MAP[status] ?? status}</Tag> : "—" },
+                      {
+                        key: "stage",
+                        label: "当前阶段",
+                        children: currentStage ? <Tag color="blue">{REVIEW_STAGE_MAP[currentStage] ?? currentStage}</Tag> : "—",
+                      },
+                    ]}
+                  />
+                  <Space wrap className="mt-4">
+                    <Link href="/editor">
+                      <Button>返回列表</Button>
+                    </Link>
+                    {currentVersion ? (
+                      <a href={editorApi.downloadUrl(Number(id), Number(currentVersion.id))} target="_blank" rel="noopener noreferrer">
+                        <Button type="primary">下载原稿</Button>
+                      </a>
+                    ) : null}
+                  </Space>
+                </Card>
+              </Col>
+            </Row>
+          </Card>
+
+          {successMessage && <Alert message={successMessage} type="success" showIcon />}
+
           {loading && (
-            <div className="flex items-center gap-3 py-6">
-              <Spin />
-              <Typography.Text type="secondary">加载稿件信息…</Typography.Text>
-            </div>
+            <Card styles={{ body: { padding: 28 } }}>
+              <div className="flex items-center gap-3 py-4">
+                <Spin />
+                <Text type="secondary">加载稿件信息…</Text>
+              </div>
+            </Card>
           )}
+
           {!loading && loadError && (
-            <>
-              <Alert message={loadError} type="warning" showIcon className="mb-4" action={<Button size="small" onClick={() => load()}>重试</Button>} />
-              <Link href="/editor"><Button type="link" className="!px-0">返回列表</Button></Link>
-            </>
+            <Card styles={{ body: { padding: 28 } }}>
+              <Alert
+                message={loadError}
+                type="warning"
+                showIcon
+                action={<Button size="small" onClick={() => load()}>重试</Button>}
+              />
+            </Card>
           )}
+
           {!loading && detail && manuscript && (
-            <>
-              {/* 主布局：左侧信息与操作区，右侧稿件预览区 */}
-              <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[380px_1fr] xl:gap-8">
-                {/* 左侧：元数据 + 操作 + 引注 + AI 报告 + 操作记录 */}
-                <div className="flex flex-col gap-4 order-2 xl:order-1">
-                  <Card size="small" className="shadow-none">
-                    <Descriptions column={1} size="small" bordered>
-                      <Descriptions.Item label="稿件编号">{String(manuscript.manuscript_no)}</Descriptions.Item>
-                      <Descriptions.Item label="标题">{String(manuscript.title)}</Descriptions.Item>
-                      <Descriptions.Item label="状态">
-                        <Tag color="default">{STATUS_MAP[status ?? ""] ?? status}</Tag>
-                      </Descriptions.Item>
-                      <Descriptions.Item label="当前阶段">
-                        {currentStage ? <Tag color="blue">{REVIEW_STAGE_MAP[currentStage] ?? currentStage}</Tag> : "—"}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="投稿人 ID">{String(manuscript.submitted_by)}</Descriptions.Item>
-                      <Descriptions.Item label="审稿分配">
-                        {assignments.length > 0 ? assignments.map((item) => `${REVIEW_STAGE_MAP[String(item.review_stage)] ?? String(item.review_stage)}: ${String(item.reviewer_name)}${item.reviewer_role ? `（${ROLE_MAP[String(item.reviewer_role)] ?? String(item.reviewer_role)}）` : ""}`).join("；") : "—"}
-                      </Descriptions.Item>
-                      {currentVersion && (
-                        <Descriptions.Item label="当前版本">
-                          <Space>
-                            <span className="text-xs">v{String(currentVersion.version_number)}，{String(currentVersion.file_name_original)}</span>
-                            <a href={editorApi.downloadUrl(Number(id), Number(currentVersion.id))} target="_blank" rel="noopener noreferrer">
-                              下载
-                            </a>
-                          </Space>
-                        </Descriptions.Item>
-                      )}
-                    </Descriptions>
+            <Row gutter={[24, 24]} align="top">
+              <Col xs={24} xl={9}>
+                <Space direction="vertical" size={24} className="flex w-full">
+                  <Card title="稿件信息">
+                    <Descriptions
+                      column={1}
+                      size="small"
+                      bordered
+                      items={[
+                        { key: "manuscript_no", label: "稿件编号", children: String(manuscript.manuscript_no) },
+                        { key: "title", label: "标题", children: String(manuscript.title) },
+                        { key: "status", label: "状态", children: <Tag>{STATUS_MAP[status ?? ""] ?? status}</Tag> },
+                        {
+                          key: "stage",
+                          label: "当前阶段",
+                          children: currentStage ? <Tag color="blue">{REVIEW_STAGE_MAP[currentStage] ?? currentStage}</Tag> : "—",
+                        },
+                        { key: "submitted_by", label: "投稿人 ID", children: String(manuscript.submitted_by) },
+                        {
+                          key: "assignments",
+                          label: "审稿分配",
+                          children: assignments.length > 0
+                            ? assignments
+                                .map((item) => `${REVIEW_STAGE_MAP[String(item.review_stage)] ?? String(item.review_stage)}: ${String(item.reviewer_name)}${item.reviewer_role ? `（${ROLE_MAP[String(item.reviewer_role)] ?? String(item.reviewer_role)}）` : ""}`)
+                                .join("；")
+                            : "—",
+                        },
+                        currentVersion
+                          ? {
+                              key: "version",
+                              label: "当前版本",
+                              children: (
+                                <Space>
+                                  <span className="text-xs">
+                                    v{String(currentVersion.version_number)}，{String(currentVersion.file_name_original)}
+                                  </span>
+                                  <a
+                                    href={editorApi.downloadUrl(Number(id), Number(currentVersion.id))}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    下载
+                                  </a>
+                                </Space>
+                              ),
+                            }
+                          : { key: "version_empty", label: "当前版本", children: "—" },
+                      ]}
+                    />
                   </Card>
+
                   {parsed && (
-                    <Card size="small" title="摘要与关键词" className="shadow-none">
-                      <Typography.Paragraph className="!mb-1 text-sm" ellipsis={{ rows: 3, expandable: true }}>
+                    <Card title="摘要与关键词">
+                      <Paragraph className="!mb-2 text-sm" ellipsis={{ rows: 4, expandable: true }}>
                         {String(parsed.abstract || "未识别")}
-                      </Typography.Paragraph>
-                      <Typography.Text type="secondary" className="text-xs">{String(parsed.keywords || "未识别")}</Typography.Text>
+                      </Paragraph>
+                      <Text type="secondary" className="text-xs">
+                        {String(parsed.keywords || "未识别")}
+                      </Text>
                     </Card>
                   )}
-                  <Card size="small" title="操作" className="shadow-none">
-                    {aiReviewLoading && (
-                      <Alert message="正在生成 AI 初审报告…" type="info" showIcon className="mb-3 text-xs" />
-                    )}
-                    <Space wrap size="small">
-                      <Button type="primary" ghost size="small" onClick={runAiReview} loading={aiReviewLoading}>
-                        生成 AI 初审报告
-                      </Button>
-                      <Button type="default" size="small" onClick={jumpToAiDetect}>
-                        一键跳转 AI 率审核
-                      </Button>
-                      <Button type="default" size="small" onClick={() => setAiAssistantOpen(true)}>AI 助手</Button>
-                      {availableActions.includes("revision_request") && (
-                        <Button size="small" onClick={() => { setRevisionModalOpen(true); setRevisionDraftError(null); }}>退修</Button>
-                      )}
-                      {availableActions.includes("reject") && (
-                        <Button danger size="small" onClick={() => setRejectConfirmOpen(true)} disabled={actionLoading}>退稿</Button>
-                      )}
-                      {availableActions.includes("submit_internal_review") && (
-                        <Button type="primary" size="small" onClick={() => runAction("submit_internal_review")} disabled={actionLoading}>提交内审</Button>
-                      )}
-                      {availableActions.includes("submit_external_review") && (
-                        <Button type="primary" size="small" onClick={() => runAction("submit_external_review")} disabled={actionLoading}>提交外审</Button>
-                      )}
-                      {availableActions.includes("submit_final_submission") && (
-                        <Button type="primary" size="small" onClick={() => runAction("submit_final_submission")} disabled={actionLoading}>提交成稿</Button>
-                      )}
-                      {availableActions.includes("accept") && (
-                        <Button type="primary" size="small" onClick={() => runAction("accept")} disabled={actionLoading}>录用</Button>
-                      )}
+
+                  <Card title="流程操作">
+                    <Space direction="vertical" size={16} className="flex w-full">
+                      {aiReviewLoading && <Alert message="正在生成 AI 初审报告…" type="info" showIcon />}
+                      <Space wrap size="small">
+                        <Button type="primary" onClick={runAiReview} loading={aiReviewLoading}>
+                          生成 AI 初审报告
+                        </Button>
+                        <Button onClick={jumpToAiDetect}>一键跳转 AI 率审核</Button>
+                        <Button onClick={() => setAiAssistantOpen(true)}>AI 助手</Button>
+                        {availableActions.includes("revision_request") && (
+                          <Button onClick={() => { setRevisionModalOpen(true); setRevisionDraftError(null); }}>
+                            退修
+                          </Button>
+                        )}
+                        {availableActions.includes("reject") && (
+                          <Button danger onClick={() => setRejectConfirmOpen(true)} disabled={actionLoading}>
+                            退稿
+                          </Button>
+                        )}
+                        {availableActions.includes("submit_internal_review") && (
+                          <Button type="primary" onClick={() => runAction("submit_internal_review")} disabled={actionLoading}>
+                            提交内审
+                          </Button>
+                        )}
+                        {availableActions.includes("submit_external_review") && (
+                          <Button type="primary" onClick={() => runAction("submit_external_review")} disabled={actionLoading}>
+                            提交外审
+                          </Button>
+                        )}
+                        {availableActions.includes("submit_final_submission") && (
+                          <Button type="primary" onClick={() => runAction("submit_final_submission")} disabled={actionLoading}>
+                            提交成稿
+                          </Button>
+                        )}
+                        {availableActions.includes("accept") && (
+                          <Button type="primary" onClick={() => runAction("accept")} disabled={actionLoading}>
+                            录用
+                          </Button>
+                        )}
+                      </Space>
                     </Space>
                   </Card>
+
                   {currentStage && (
-                    <Card size="small" title="结构化审稿意见" className="shadow-none">
+                    <Card title="结构化审稿意见">
                       {currentStageAssignment ? (
-                        <div className="space-y-3">
-                          <Typography.Text type="secondary" className="text-xs">
+                        <Space direction="vertical" size={12} className="flex w-full">
+                          <Text type="secondary" className="text-xs">
                             当前以「{REVIEW_STAGE_MAP[currentStage] ?? currentStage}」身份提交意见。保存后，可继续点击对应阶段按钮推进流程。
-                          </Typography.Text>
-                          <div className="grid grid-cols-2 gap-2">
-                            <Select
-                              value={reviewRecommendation}
-                              onChange={setReviewRecommendation}
-                              options={Object.entries(REVIEW_RECOMMENDATION_MAP).map(([value, label]) => ({ value, label }))}
-                            />
-                            <InputNumber min={1} max={10} value={overallScore ?? undefined} onChange={(v) => setOverallScore(v == null ? null : Number(v))} placeholder="综合评分" className="w-full" />
-                            <InputNumber min={1} max={10} value={originalityScore ?? undefined} onChange={(v) => setOriginalityScore(v == null ? null : Number(v))} placeholder="创新性" className="w-full" />
-                            <InputNumber min={1} max={10} value={rigorScore ?? undefined} onChange={(v) => setRigorScore(v == null ? null : Number(v))} placeholder="论证严谨性" className="w-full" />
-                            <InputNumber min={1} max={10} value={writingScore ?? undefined} onChange={(v) => setWritingScore(v == null ? null : Number(v))} placeholder="文字与结构" className="w-full" />
-                          </div>
+                          </Text>
+                          <Row gutter={[12, 12]}>
+                            <Col span={12}>
+                              <Select
+                                value={reviewRecommendation}
+                                onChange={setReviewRecommendation}
+                                options={Object.entries(REVIEW_RECOMMENDATION_MAP).map(([value, label]) => ({ value, label }))}
+                              />
+                            </Col>
+                            <Col span={12}>
+                              <InputNumber min={1} max={10} value={overallScore ?? undefined} onChange={(v) => setOverallScore(v == null ? null : Number(v))} placeholder="综合评分" className="w-full" />
+                            </Col>
+                            <Col span={12}>
+                              <InputNumber min={1} max={10} value={originalityScore ?? undefined} onChange={(v) => setOriginalityScore(v == null ? null : Number(v))} placeholder="创新性" className="w-full" />
+                            </Col>
+                            <Col span={12}>
+                              <InputNumber min={1} max={10} value={rigorScore ?? undefined} onChange={(v) => setRigorScore(v == null ? null : Number(v))} placeholder="论证严谨性" className="w-full" />
+                            </Col>
+                            <Col span={12}>
+                              <InputNumber min={1} max={10} value={writingScore ?? undefined} onChange={(v) => setWritingScore(v == null ? null : Number(v))} placeholder="文字与结构" className="w-full" />
+                            </Col>
+                          </Row>
                           <Input.TextArea rows={3} value={reviewSummary} onChange={(e) => setReviewSummary(e.target.value)} placeholder="总体评价摘要" />
                           <Input.TextArea rows={4} value={reviewMajorIssues} onChange={(e) => setReviewMajorIssues(e.target.value)} placeholder="主要问题" />
                           <Input.TextArea rows={4} value={reviewRequirements} onChange={(e) => setReviewRequirements(e.target.value)} placeholder="修改要求 / 处理建议" />
                           <Input.TextArea rows={3} value={reviewConfidentialNotes} onChange={(e) => setReviewConfidentialNotes(e.target.value)} placeholder="仅编辑部可见备注（可选）" />
-                          <Button type="primary" size="small" onClick={submitStructuredReview} loading={reviewSubmitLoading}>
+                          <Button type="primary" onClick={submitStructuredReview} loading={reviewSubmitLoading}>
                             保存结构化意见
                           </Button>
-                        </div>
+                        </Space>
                       ) : (
-                        <Typography.Text type="secondary" className="text-xs">
+                        <Text type="secondary" className="text-xs">
                           当前阶段未分配给你，仅可查看已提交的审稿意见。
-                        </Typography.Text>
+                        </Text>
                       )}
                     </Card>
                   )}
+
                   {aiError && <Alert message={aiError} type="error" showIcon />}
-                  <Card size="small" title="引注检查" className="shadow-none">
-                    <Space wrap className="mb-2" align="center" size="small">
-                      <Button type="default" size="small" onClick={runCitationCheck} loading={citationCheckLoading}>
-                        {citationCheckLoading ? "检查中…" : "运行引注检查"}
-                      </Button>
-                      <label className="flex items-center gap-1 cursor-pointer text-xs text-gray-600">
-                        <input type="checkbox" checked={citationCheckUseLlm} onChange={(e) => setCitationCheckUseLlm(e.target.checked)} className="rounded border-gray-300" />
-                        使用大模型辅助
-                      </label>
+
+                  <Card title="引注检查">
+                    <Space direction="vertical" size={12} className="flex w-full">
+                      <Space wrap size="small" align="center">
+                        <Button onClick={runCitationCheck} loading={citationCheckLoading}>
+                          {citationCheckLoading ? "检查中…" : "运行引注检查"}
+                        </Button>
+                        <label className="flex items-center gap-1 text-xs text-[#667085]">
+                          <input
+                            type="checkbox"
+                            checked={citationCheckUseLlm}
+                            onChange={(e) => setCitationCheckUseLlm(e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          使用大模型辅助
+                        </label>
+                      </Space>
+                      {citationCheckError && <Alert message={citationCheckError} type="error" showIcon />}
+                      {citationIssues.length > 0 ? (
+                        <Text strong className="text-xs">发现 {citationIssues.length} 处引注问题</Text>
+                      ) : !citationCheckLoading ? (
+                        <Text type="secondary" className="text-xs">运行后显示结果</Text>
+                      ) : null}
+                      {citationIssues.length > 0 && (
+                        <List
+                          size="small"
+                          dataSource={citationIssues}
+                          className="max-h-[220px] overflow-y-auto"
+                          renderItem={(item) => (
+                            <List.Item className="!px-0">
+                              <div className="w-full text-xs">
+                                <Text strong className="text-xs">[{item.location}] </Text>
+                                <Text className="text-xs">{item.description}</Text>
+                                {item.suggestion ? (
+                                  <div className="mt-1 text-[#667085]">建议：{item.suggestion}</div>
+                                ) : null}
+                              </div>
+                            </List.Item>
+                          )}
+                        />
+                      )}
                     </Space>
-                    {citationCheckError && <Alert message={citationCheckError} type="error" showIcon className="mb-2" />}
-                    {citationIssues.length > 0 ? (
-                      <Typography.Text strong className="text-xs">发现 {citationIssues.length} 处引注问题</Typography.Text>
-                    ) : !citationCheckLoading && (
-                      <Typography.Text type="secondary" className="text-xs">运行后显示结果</Typography.Text>
-                    )}
-                    {citationIssues.length > 0 && (
-                      <List
-                        size="small"
-                        dataSource={citationIssues}
-                        className="mt-2 max-h-[200px] overflow-y-auto"
-                        renderItem={(item) => (
-                          <List.Item className="!px-0">
-                            <Typography.Text strong className="text-xs">[{item.location}]</Typography.Text>
-                            <Typography.Text className="text-xs ml-1">{item.description}</Typography.Text>
-                          </List.Item>
-                        )}
-                      />
-                    )}
                   </Card>
+
                   {aiReport && (
-                    <Card
-                      size="small"
-                      title="AI 初审报告"
-                      className="shadow-none"
-                      extra={<Button type="link" size="small" onClick={copyReport}>复制</Button>}
-                    >
-                      <div className="max-h-[280px] overflow-y-auto pr-1 text-xs">
+                    <Card title="AI 初审报告" extra={<Button type="link" size="small" onClick={copyReport}>复制</Button>}>
+                      <div className="max-h-[320px] overflow-y-auto pr-1 text-xs">
                         <TypewriterMarkdown content={aiReport.content} enabled={reportJustGenerated} />
                       </div>
                     </Card>
                   )}
+
                   {reviewSubmissions.length > 0 && (
-                    <Card size="small" title="已提交审稿意见" className="shadow-none">
+                    <Card title="已提交审稿意见">
                       <List
                         size="small"
                         dataSource={reviewSubmissions}
@@ -586,58 +692,59 @@ export default function EditorManuscriptDetailPage() {
                       />
                     </Card>
                   )}
+
                   {editorActions.length > 0 && (
-                    <Card size="small" title="操作记录" className="shadow-none">
+                    <Card title="操作记录">
                       <List
                         size="small"
                         dataSource={editorActions.slice(0, 5)}
                         renderItem={(a) => (
                           <List.Item className="!px-0">
-                            <span className="text-xs">{String(a.action_type)} → {String(a.to_status)}</span>
-                            <Typography.Text type="secondary" className="text-xs block">
-                              {`${String(a.operator_name ?? "")} ${String(a.created_at ?? "").slice(0, 16)}`.trim()}
-                            </Typography.Text>
+                            <div className="w-full text-xs">
+                              <span>{String(a.action_type)} → {String(a.to_status)}</span>
+                              <Text type="secondary" className="block text-xs">
+                                {`${String(a.operator_name ?? "")} ${String(a.created_at ?? "").slice(0, 16)}`.trim()}
+                              </Text>
+                            </div>
                           </List.Item>
                         )}
                       />
                       {editorActions.length > 5 && (
-                        <Typography.Text type="secondary" className="text-xs">共 {editorActions.length} 条</Typography.Text>
+                        <Text type="secondary" className="text-xs">共 {editorActions.length} 条</Text>
                       )}
                     </Card>
                   )}
-                  <Link href="/editor"><Button type="link" size="small" className="!px-0">返回列表</Button></Link>
-                </div>
+                </Space>
+              </Col>
 
-                {/* 右侧：稿件预览（主视觉区域） */}
-                <div className="order-1 !self-start xl:order-2 xl:!self-start">
+              <Col xs={24} xl={15}>
+                <Space direction="vertical" size={24} className="flex w-full">
                   <Card
-                    size="small"
                     title="原始稿件"
-                    className="!h-auto shadow-none"
                     extra={
                       currentVersion ? (
-                        <a href={editorApi.downloadUrl(Number(id), Number(currentVersion.id))} target="_blank" rel="noopener noreferrer" className="text-xs">
+                        <a
+                          href={editorApi.downloadUrl(Number(id), Number(currentVersion.id))}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
                           下载原稿
                         </a>
                       ) : null
                     }
                   >
                     {!currentVersion ? (
-                      <Typography.Text type="secondary">当前稿件暂无可阅读版本。</Typography.Text>
+                      <Text type="secondary">当前稿件暂无可阅读版本。</Text>
                     ) : (
-                      <div className="flex flex-col gap-2">
-                        <Typography.Text type="secondary" className="text-xs">
+                      <Space direction="vertical" size={12} className="flex w-full">
+                        <Text type="secondary" className="text-xs">
                           文件：{String(currentVersion.file_name_original || "未命名文件")}
-                          {(previewType === "docx" || previewType === "doc") && (
-                            <span className="ml-2">
-                              （可优先使用「PDF 预览」查看版式）
-                            </span>
-                          )}
-                        </Typography.Text>
+                          {(previewType === "docx" || previewType === "doc") && <span className="ml-2">（可优先使用「PDF 预览」查看版式）</span>}
+                        </Text>
                         {previewLoading ? (
                           <div className="flex items-center gap-3 py-12">
                             <Spin />
-                            <Typography.Text type="secondary">正在加载预览…</Typography.Text>
+                            <Text type="secondary">正在加载预览…</Text>
                           </div>
                         ) : null}
                         {previewError ? <Alert message={previewError} type="warning" showIcon /> : null}
@@ -656,38 +763,33 @@ export default function EditorManuscriptDetailPage() {
                           />
                         ) : null}
                         {!previewLoading && (previewType === "docx" || previewType === "doc") && !pdfPreviewUrl && (
-                          <div className="space-y-2">
-                            <Button
-                              type="primary"
-                              size="small"
-                              onClick={loadPdfPreview}
-                              loading={pdfPreviewLoading}
-                            >
+                          <Space direction="vertical" size={12} className="flex w-full">
+                            <Button type="primary" onClick={loadPdfPreview} loading={pdfPreviewLoading}>
                               {pdfPreviewLoading ? "正在生成 PDF…" : "转为 PDF 预览"}
                             </Button>
                             {pdfPreviewError && <Alert message={pdfPreviewError} type="warning" showIcon />}
                             {previewType === "docx" && (
-                              <div className="max-h-[68vh] overflow-y-auto border border-[#e8e8e8] rounded bg-white p-4 text-sm leading-7 text-[#2c2c2e]">
+                              <div className="max-h-[68vh] overflow-y-auto rounded border border-[#e8e8e8] bg-white p-4 text-sm leading-7 text-[#2c2c2e]">
                                 {docxPreviewText ? (
                                   <pre className="whitespace-pre-wrap font-sans">{docxPreviewText}</pre>
                                 ) : (
-                                  <Typography.Text type="secondary">暂无文本预览，请点击「转为 PDF 预览」或下载原稿查看。</Typography.Text>
+                                  <Text type="secondary">暂无文本预览，请点击「转为 PDF 预览」或下载原稿查看。</Text>
                                 )}
                               </div>
                             )}
                             {previewType === "doc" && !docxPreviewText && (
-                              <Typography.Text type="secondary">.doc 格式可尝试「转为 PDF 预览」（需服务器安装 LibreOffice），或下载原稿查看。</Typography.Text>
+                              <Text type="secondary">.doc 格式可尝试「转为 PDF 预览」（需服务器安装 LibreOffice），或下载原稿查看。</Text>
                             )}
-                          </div>
+                          </Space>
                         )}
-                      </div>
+                      </Space>
                     )}
                   </Card>
-                </div>
-              </div>
-            </>
+                </Space>
+              </Col>
+            </Row>
           )}
-        </Card>
+        </Space>
       </main>
 
       <Modal
