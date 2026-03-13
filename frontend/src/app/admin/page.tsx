@@ -236,38 +236,38 @@ export default function AdminDashboardPage() {
       </div>
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} md={8}>
-          <Card size="small" className="shadow-sm">
+          <Card size="small" className="shadow-none">
             <Statistic title="稿件总数" value={stats.manuscripts_total} />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8}>
-          <Card size="small" className="shadow-sm">
+          <Card size="small" className="shadow-none">
             <Statistic title="待处理稿件" value={stats.manuscripts_pending} />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8}>
-          <Card size="small" className="shadow-sm">
+          <Card size="small" className="shadow-none">
             <Statistic title="栏目数" value={stats.sections_count} />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8}>
-          <Card size="small" className="shadow-sm">
+          <Card size="small" className="shadow-none">
             <Statistic title="退修模板数" value={stats.templates_count} />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8}>
-          <Card size="small" className="shadow-sm">
+          <Card size="small" className="shadow-none">
             <Statistic title="作者" value={stats.users_by_role?.author ?? 0} />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8}>
-          <Card size="small" className="shadow-sm">
+          <Card size="small" className="shadow-none">
             <Statistic title="内审/外审/编辑" value={(stats.users_by_role?.internal_reviewer ?? 0) + (stats.users_by_role?.external_reviewer ?? 0) + (stats.users_by_role?.editor ?? 0)} />
           </Card>
         </Col>
       </Row>
 
-      <Card size="small" title="状态看板" className="mt-6 shadow-sm">
+      <Card size="small" title="状态看板" className="mt-6 shadow-none">
         {statusEntries.length === 0 ? (
           <Empty description="暂无稿件数据" />
         ) : (
@@ -285,7 +285,7 @@ export default function AdminDashboardPage() {
         )}
       </Card>
 
-      <Card size="small" title="快捷入口" className="mt-6 shadow-sm">
+      <Card size="small" title="快捷入口" className="mt-6 shadow-none">
         <Row gutter={[12, 12]}>
           {quickEntries.map((item) => (
             <Col key={item.key} xs={24} sm={12}>
@@ -311,7 +311,7 @@ export default function AdminDashboardPage() {
       <Card
         size="small"
         title="待处理稿件"
-        className="mt-6 shadow-sm"
+        className="mt-6 shadow-none"
         extra={(
           <Link href="/admin/manuscripts" className="text-[#8B1538] hover:underline">
             查看全部
@@ -337,7 +337,7 @@ export default function AdminDashboardPage() {
           <Card
             size="small"
             title="最近注册用户"
-            className="mt-4 shadow-sm"
+            className="mt-4 shadow-none"
             extra={(
               <Link href="/admin/users" className="text-[#8B1538] hover:underline">
                 进入用户管理
@@ -362,7 +362,7 @@ export default function AdminDashboardPage() {
           <Card
             size="small"
             title="最近处理记录"
-            className="mt-4 shadow-sm"
+            className="mt-4 shadow-none"
             extra={(
               <Link href="/admin/manuscripts" className="text-[#8B1538] hover:underline">
                 进入稿件总览

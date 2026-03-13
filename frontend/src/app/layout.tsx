@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
-import { ConfigProvider } from "antd";
+import { App as AntApp, ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { AuthProvider } from "@/contexts/AuthContext";
 import DocumentTitle from "@/components/DocumentTitle";
@@ -22,7 +22,7 @@ export default function RootLayout({
     <html lang="zh-CN">
       <head>
         <link
-          href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&display=swap"
           rel="stylesheet"
         />
       </head>
@@ -35,20 +35,17 @@ export default function RootLayout({
         </a>
         <AntdRegistry>
           <ConfigProvider theme={theme} locale={zhCN}>
-            <AuthProvider>
-              <DocumentTitle />
-              <div className="relative flex min-h-screen flex-1 flex-col bg-[#f5f6f8]">
-                <div
-                  className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-[0.06]"
-                  style={{ backgroundImage: "url(/banner.jpg)", backgroundPosition: "center", backgroundSize: "cover" }}
-                  aria-hidden
-                />
-                <div className="relative z-10 flex flex-1 flex-col">
-                  {children}
-                  <Footer />
+            <AntApp>
+              <AuthProvider>
+                <DocumentTitle />
+                <div className="flex min-h-screen flex-1 flex-col bg-[#f4f6f8]">
+                  <div className="flex flex-1 flex-col">
+                    {children}
+                    <Footer />
+                  </div>
                 </div>
-              </div>
-            </AuthProvider>
+              </AuthProvider>
+            </AntApp>
           </ConfigProvider>
         </AntdRegistry>
       </body>

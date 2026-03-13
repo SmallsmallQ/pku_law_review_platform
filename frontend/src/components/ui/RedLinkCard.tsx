@@ -16,7 +16,7 @@ export default function RedLinkCard({
 }) {
   return (
     <div
-      className={`rounded-lg bg-[#8B1538] p-6 text-white shadow-md ${className}`}
+      className={`rounded-lg border border-[#8B1538] bg-[#8B1538] p-6 text-white shadow-none ${className}`}
     >
       {title && (
         <h3 className="mb-4 border-b border-white/30 pb-2 text-base font-bold">

@@ -34,7 +34,7 @@ export function SectionTitle({
   );
 }
 
-/** 白底内容卡片：圆角、浅阴影、内边距，仿院庆网内容区 */
+/** 白底内容卡片：边框分区、无阴影、内边距，仿院庆网内容区 */
 export default function SectionCard({
   children,
   className = "",
@@ -53,7 +53,7 @@ export default function SectionCard({
   const isCompact = className.includes("p-0");
   return (
     <div
-      className={`rounded-lg border border-[#e0e0e0] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] ${isCompact ? "p-0" : "p-6"} ${className}`}
+      className={`rounded-lg border border-[#e0e0e0] bg-white shadow-none ${isCompact ? "p-0" : "p-6"} ${className}`}
     >
       {title != null && (
         <div className={isCompact ? "px-6 pt-6" : undefined}>

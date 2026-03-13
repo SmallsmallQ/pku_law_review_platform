@@ -420,7 +420,7 @@ export default function EditorManuscriptDetailPage() {
               <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[380px_1fr] xl:gap-8">
                 {/* 左侧：元数据 + 操作 + 引注 + AI 报告 + 操作记录 */}
                 <div className="flex flex-col gap-4 order-2 xl:order-1">
-                  <Card size="small" className="shadow-sm">
+                  <Card size="small" className="shadow-none">
                     <Descriptions column={1} size="small" bordered>
                       <Descriptions.Item label="稿件编号">{String(manuscript.manuscript_no)}</Descriptions.Item>
                       <Descriptions.Item label="标题">{String(manuscript.title)}</Descriptions.Item>
@@ -447,14 +447,14 @@ export default function EditorManuscriptDetailPage() {
                     </Descriptions>
                   </Card>
                   {parsed && (
-                    <Card size="small" title="摘要与关键词" className="shadow-sm">
+                    <Card size="small" title="摘要与关键词" className="shadow-none">
                       <Typography.Paragraph className="!mb-1 text-sm" ellipsis={{ rows: 3, expandable: true }}>
                         {String(parsed.abstract || "未识别")}
                       </Typography.Paragraph>
                       <Typography.Text type="secondary" className="text-xs">{String(parsed.keywords || "未识别")}</Typography.Text>
                     </Card>
                   )}
-                  <Card size="small" title="操作" className="shadow-sm">
+                  <Card size="small" title="操作" className="shadow-none">
                     {aiReviewLoading && (
                       <Alert message="正在生成 AI 初审报告…" type="info" showIcon className="mb-3 text-xs" />
                     )}
@@ -487,7 +487,7 @@ export default function EditorManuscriptDetailPage() {
                     </Space>
                   </Card>
                   {currentStage && (
-                    <Card size="small" title="结构化审稿意见" className="shadow-sm">
+                    <Card size="small" title="结构化审稿意见" className="shadow-none">
                       {currentStageAssignment ? (
                         <div className="space-y-3">
                           <Typography.Text type="secondary" className="text-xs">
@@ -520,7 +520,7 @@ export default function EditorManuscriptDetailPage() {
                     </Card>
                   )}
                   {aiError && <Alert message={aiError} type="error" showIcon />}
-                  <Card size="small" title="引注检查" className="shadow-sm">
+                  <Card size="small" title="引注检查" className="shadow-none">
                     <Space wrap className="mb-2" align="center" size="small">
                       <Button type="default" size="small" onClick={runCitationCheck} loading={citationCheckLoading}>
                         {citationCheckLoading ? "检查中…" : "运行引注检查"}
@@ -554,7 +554,7 @@ export default function EditorManuscriptDetailPage() {
                     <Card
                       size="small"
                       title="AI 初审报告"
-                      className="shadow-sm"
+                      className="shadow-none"
                       extra={<Button type="link" size="small" onClick={copyReport}>复制</Button>}
                     >
                       <div className="max-h-[280px] overflow-y-auto pr-1 text-xs">
@@ -563,7 +563,7 @@ export default function EditorManuscriptDetailPage() {
                     </Card>
                   )}
                   {reviewSubmissions.length > 0 && (
-                    <Card size="small" title="已提交审稿意见" className="shadow-sm">
+                    <Card size="small" title="已提交审稿意见" className="shadow-none">
                       <List
                         size="small"
                         dataSource={reviewSubmissions}
@@ -587,7 +587,7 @@ export default function EditorManuscriptDetailPage() {
                     </Card>
                   )}
                   {editorActions.length > 0 && (
-                    <Card size="small" title="操作记录" className="shadow-sm">
+                    <Card size="small" title="操作记录" className="shadow-none">
                       <List
                         size="small"
                         dataSource={editorActions.slice(0, 5)}
@@ -613,7 +613,7 @@ export default function EditorManuscriptDetailPage() {
                   <Card
                     size="small"
                     title="原始稿件"
-                    className="!h-auto shadow-sm"
+                    className="!h-auto shadow-none"
                     extra={
                       currentVersion ? (
                         <a href={editorApi.downloadUrl(Number(id), Number(currentVersion.id))} target="_blank" rel="noopener noreferrer" className="text-xs">
