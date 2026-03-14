@@ -55,13 +55,13 @@ export default function HeaderBar() {
 
   return (
     <Header className="app-header !h-auto !bg-white !px-0 !py-0 !leading-none border-b border-[#e5e7eb]">
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
         <div className="min-w-0 shrink-0">
           <Link href="/" className="block text-[#111827] no-underline">
-            <Text className="block text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8B1538]">
+            <Text className="block text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8B1538]">
               Peking University Law Journal
             </Text>
-            <Text className="font-serif-sc block text-[22px] font-semibold text-[#1f2937]">
+            <Text className="font-serif-sc block text-[20px] font-semibold text-[#1f2937]">
               《中外法学》
             </Text>
           </Link>

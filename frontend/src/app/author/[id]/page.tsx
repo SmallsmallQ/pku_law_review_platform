@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Alert, Breadcrumb, Button, Card, Descriptions, List, Space, Spin, Tag, Typography } from "antd";
+import { Alert, Breadcrumb, Button, Descriptions, List, Space, Spin, Tag, Typography, Divider } from "antd";
 import type { BreadcrumbItemType } from "antd/es/breadcrumb/Breadcrumb";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
@@ -77,102 +77,144 @@ export default function AuthorManuscriptDetailPage() {
   ];
 
   return (
-    <div className="bg-[#f5f6f8]">
+    <div className="bg-white text-[#1d1d1f] min-h-screen flex flex-col">
       <HeaderBar />
-      <main className="w-full px-5 py-8 sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
-        <Card>
-          <Breadcrumb items={breadcrumbItems} className="mb-4" />
-          <Typography.Title level={5} className="!mb-4">
+      <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <Breadcrumb items={breadcrumbItems} className="mb-6" />
+        
+        <div className="flex items-center justify-between mb-2">
+          <Typography.Title level={2} className="!mb-0 !font-medium !text-gray-900">
             稿件详情
           </Typography.Title>
-          {revisedMessage && (
-            <Alert message="修订稿已提交成功" type="success" showIcon className="mb-4" />
-          )}
-          {loading && (
-            <div className="flex items-center gap-3 py-6">
-              <Spin />
-              <Typography.Text type="secondary">加载稿件信息…</Typography.Text>
-            </div>
-          )}
-          {!loading && loadError && (
-            <>
-              <Alert message={loadError} type="warning" showIcon className="mb-4" action={<Button size="small" onClick={() => window.location.reload()}>刷新</Button>} />
-              <Link href="/author"><Button type="link" className="!px-0">返回我的稿件</Button></Link>
-            </>
-          )}
-          {!loading && detail && (
-            <>
-              <Descriptions column={1} size="small" bordered className="mb-4">
-                <Descriptions.Item label="稿件编号">{manuscriptNo ?? "—"}</Descriptions.Item>
-                <Descriptions.Item label="标题">{title ?? "—"}</Descriptions.Item>
-                <Descriptions.Item label="状态">
-                  <Tag color="default">{STATUS_MAP[status ?? ""] ?? status ?? "—"}</Tag>
-                </Descriptions.Item>
-                {currentVersion && (
-                  <Descriptions.Item label="当前版本">
-                    <Space>
-                      <span>v{String(currentVersion.version_number)}，{String(currentVersion.file_name_original)}</span>
-                      <a
-                        href={manuscriptsApi.downloadUrl(Number(id), Number(currentVersion.id))}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        下载
-                      </a>
-                    </Space>
+          <div className="flex items-center gap-3">
+             {status === "revision_requested" && (
+                <Link href={`/author/${id}/revise`}>
+                  <Button type="primary" className="bg-[#8B1538] hover:!bg-[#A51D45] rounded-sm border-none shadow-sm h-9">上传修订稿</Button>
+                </Link>
+             )}
+             <Link href="/author">
+                <Button className="rounded-sm h-9">返回我的稿件</Button>
+             </Link>
+          </div>
+        </div>
+
+        <Divider className="!border-[#e5e7eb] !mb-8 !mt-4" />
+
+        {revisedMessage && (
+          <Alert message="修订稿已提交成功" type="success" showIcon className="mb-6 rounded-sm" />
+        )}
+        
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-20 bg-gray-50 border border-[#e5e7eb] rounded-sm">
+            <Spin size="large" />
+            <Typography.Text type="secondary" className="mt-4">加载稿件信息中…</Typography.Text>
+          </div>
+        )}
+        
+        {!loading && loadError && (
+          <div className="flex flex-col items-center justify-center py-20 bg-red-50 border border-red-100 rounded-sm space-y-4">
+             <Alert message={loadError} type="warning" showIcon className="rounded-sm shadow-sm" />
+             <Space>
+               <Button size="middle" onClick={() => window.location.reload()} className="rounded-sm">刷新重试</Button>
+               <Link href="/author"><Button type="primary" className="bg-[#8B1538] hover:!bg-[#A51D45] border-none rounded-sm">返回我的稿件</Button></Link>
+             </Space>
+          </div>
+        )}
+        
+        {!loading && detail && (
+          <div className="space-y-12">
+            <section>
+                <Typography.Title level={4} className="!mb-6 !font-normal !text-gray-900 border-l-4 border-[#8B1538] pl-3">
+                  基本信息
+                </Typography.Title>
+                <Descriptions column={1} size="default" bordered className="bg-white rounded-sm overflow-hidden border-[#e5e7eb]" labelStyle={{ width: '140px', backgroundColor: '#f9fafb', color: '#4b5563' }} contentStyle={{ color: '#1f2937' }}>
+                  <Descriptions.Item label="相关编号">{manuscriptNo ?? "—"}</Descriptions.Item>
+                  <Descriptions.Item label="稿件全称">{title ?? "—"}</Descriptions.Item>
+                  <Descriptions.Item label="当前状态">
+                    <Tag className="rounded-sm px-2 py-0.5 border" color="default">{STATUS_MAP[status ?? ""] ?? status ?? "—"}</Tag>
                   </Descriptions.Item>
-                )}
-              </Descriptions>
-              {versions.length > 0 && (
-                <Card size="small" title="历史版本" className="mb-4">
+                  {currentVersion && (
+                    <Descriptions.Item label="最近上传版本">
+                      <div className="flex items-center justify-between">
+                         <span className="text-gray-700">版本标识：v{String(currentVersion.version_number)}，文件名：{String(currentVersion.file_name_original)}</span>
+                         <a
+                          href={manuscriptsApi.downloadUrl(Number(id), Number(currentVersion.id))}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#8B1538] hover:underline hover:text-[#A51D45] font-medium ml-4 bg-red-50/50 px-3 py-1 rounded border border-red-100"
+                         >
+                          安全下载
+                         </a>
+                      </div>
+                    </Descriptions.Item>
+                  )}
+                </Descriptions>
+            </section>
+
+            {revisions.length > 0 && (
+              <section>
+                 <Typography.Title level={4} className="!mb-6 !font-normal !text-gray-900 border-l-4 border-orange-500 pl-3">
+                    系统退修历史与编辑意见
+                  </Typography.Title>
+                  <div className="border border-orange-200 rounded-sm bg-orange-50/30 overflow-hidden shadow-sm">
+                    <List
+                      className="divide-y divide-orange-100"
+                      dataSource={revisions}
+                      renderItem={(r, index) => (
+                        <List.Item className="!p-6 hover:bg-white transition-colors">
+                          <div className="w-full">
+                            <div className="flex items-center justify-between mb-4 border-b border-orange-100/50 pb-3">
+                              <span className="font-medium text-orange-800">第 {revisions.length - index} 次退修记录</span>
+                              <Typography.Text className="text-sm text-orange-600/80 bg-orange-100 px-2 py-0.5 rounded-sm">
+                                下达于: {r.created_at?.slice(0, 19)}
+                              </Typography.Text>
+                            </div>
+                            <div className="prose prose-sm prose-orange max-w-none text-gray-700 bg-white/50 p-4 rounded border border-orange-100/30">
+                              {r.comment ? <MarkdownRenderer content={r.comment} /> : <span className="text-gray-400 italic">管理员未附具体修改意见，通常为格式退修，请自查。</span>}
+                            </div>
+                          </div>
+                        </List.Item>
+                      )}
+                    />
+                  </div>
+              </section>
+            )}
+
+            {versions.length > 0 && (
+              <section>
+                <Typography.Title level={4} className="!mb-6 !font-normal !text-gray-900 border-l-4 border-gray-400 pl-3">
+                  稿件正文历史版本归档
+                </Typography.Title>
+                <div className="border border-[#e5e7eb] rounded-sm bg-white overflow-hidden shadow-sm">
                   <List
-                    size="small"
+                    className="divide-y divide-[#e5e7eb]"
                     dataSource={versions}
                     renderItem={(v) => (
                       <List.Item
+                        className="!p-4 hover:bg-gray-50 transition-colors flex justify-between items-center group"
                         actions={[
-                          <a key="dl" href={manuscriptsApi.downloadUrl(Number(id), v.id)} target="_blank" rel="noopener noreferrer">
-                            下载
+                          <a key="dl" href={manuscriptsApi.downloadUrl(Number(id), v.id)} target="_blank" rel="noopener noreferrer" className="opacity-0 group-hover:opacity-100 transition-opacity bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded text-sm font-medium">
+                            下载此版本
                           </a>,
                         ]}
                       >
-                        v{v.version_number} — {v.file_name_original || "—"}（{v.created_at?.slice(0, 19)}）
-                      </List.Item>
-                    )}
-                  />
-                </Card>
-              )}
-              {revisions.length > 0 && (
-                <Card size="small" title="退修意见" className="mb-4">
-                  <List
-                    size="small"
-                    dataSource={revisions}
-                    renderItem={(r) => (
-                      <List.Item>
-                        <div>
-                          {r.comment ? <MarkdownRenderer content={r.comment} /> : <p className="mb-0">—</p>}
-                          <Typography.Text type="secondary" className="text-xs">
-                            {r.created_at?.slice(0, 19)}
-                          </Typography.Text>
+                        <div className="flex items-center gap-4">
+                           <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-serif-sc font-medium">
+                              v{v.version_number}
+                           </span>
+                           <div className="flex flex-col">
+                              <span className="text-gray-800 font-medium">{v.file_name_original || "未命名原稿"}</span>
+                              <span className="text-xs text-gray-500 mt-0.5">归档时间: {v.created_at?.slice(0, 19)}</span>
+                           </div>
                         </div>
                       </List.Item>
                     )}
                   />
-                </Card>
-              )}
-              {status === "revision_requested" && (
-                <div className="mb-4">
-                  <Link href={`/author/${id}/revise`}>
-                    <Button type="primary">上传修订稿</Button>
-                  </Link>
                 </div>
-              )}
-              <Link href="/author">
-                <Button type="link" className="!px-0">返回我的稿件</Button>
-              </Link>
-            </>
-          )}
-        </Card>
+              </section>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );

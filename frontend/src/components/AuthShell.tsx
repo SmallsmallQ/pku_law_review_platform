@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Card, Divider, Space, Typography } from "antd";
+import { Divider, Space, Typography } from "antd";
 import HeaderBar from "@/components/HeaderBar";
 
 const { Paragraph, Text, Title } = Typography;
@@ -30,47 +30,49 @@ export default function AuthShell({
   footer,
 }: AuthShellProps) {
   return (
-    <div className="bg-[#f5f6f8]">
+    <div className="bg-white min-h-screen flex flex-col">
       <HeaderBar />
       <main
         id="main-content"
-        className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8"
+        className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 lg:px-8 flex-1 flex flex-col justify-center"
         aria-label={title}
       >
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
-          <Card className="!rounded-none !border-[#d9dde4] !shadow-none" styles={{ body: { padding: 28 } }}>
+        <div className="grid gap-16 lg:grid-cols-[minmax(0,1fr)_480px]">
+          {/* Left Column Text & Highlights */}
+          <div className="py-8">
             <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8B1538]">{eyebrow}</Text>
-            <Title level={2} className="font-serif-sc !mb-3 !mt-4 !text-[#2d313d]">
+            <Title level={1} className="font-serif-sc !mb-6 !mt-6 !text-[#1f2937]">
               {title}
             </Title>
-            <Paragraph className="!mb-0 !max-w-2xl !text-[16px] !leading-8 !text-[#5f6573]">
+            <Paragraph className="!mb-0 !max-w-2xl !text-[16px] !leading-relaxed !text-[#667085]">
               {subtitle}
             </Paragraph>
 
-            <Divider className="!my-8 !border-[#e6eaf0]" />
+            <Divider className="!my-12 !border-[#e5e7eb]" />
 
             <Space direction="vertical" size={0} className="w-full">
               {highlights.map((item, index) => (
                 <div
                   key={item.title}
-                  className={`grid gap-4 border-[#e6eaf0] py-4 sm:grid-cols-[44px_1fr] ${index === 0 ? "border-t" : ""} border-b`}
+                  className={`grid gap-5 border-[#e5e7eb] py-6 sm:grid-cols-[48px_1fr] ${index === 0 ? "border-t" : ""} border-b`}
                 >
-                  <span className="inline-flex h-11 w-11 items-center justify-center border border-[#d9dde4] bg-[#fafafa] text-[18px] text-[#8B1538]">
+                  <span className="inline-flex h-12 w-12 items-center justify-center bg-red-50 text-[20px] rounded-full text-[#8B1538]">
                     {item.icon}
                   </span>
                   <div>
-                    <Text className="block text-[16px] font-semibold text-[#2d313d]">{item.title}</Text>
-                    <Text className="mt-1 block text-[14px] leading-7 text-[#6c7280]">{item.description}</Text>
+                    <Text className="block text-[16px] font-medium text-[#1f2937]">{item.title}</Text>
+                    <Text className="mt-2 block text-[14px] leading-relaxed text-[#667085]">{item.description}</Text>
                   </div>
                 </div>
               ))}
             </Space>
-          </Card>
+          </div>
 
-          <Card className="!rounded-none !border-[#d9dde4] !shadow-none" styles={{ body: { padding: 28 } }}>
+          {/* Right Column Auth Form */}
+          <div className="bg-white p-8 sm:p-10 border border-[#e5e7eb] shadow-sm rounded-sm self-start">
             {children}
-            {footer ? <div className="mt-8 border-t border-[#e6eaf0] pt-6">{footer}</div> : null}
-          </Card>
+            {footer ? <div className="mt-8 border-t border-[#e5e7eb] pt-6">{footer}</div> : null}
+          </div>
         </div>
       </main>
     </div>

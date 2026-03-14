@@ -38,7 +38,7 @@ export default function RootLayout({
             <AntApp>
               <AuthProvider>
                 <DocumentTitle />
-                <div className="flex min-h-screen flex-1 flex-col bg-[#f4f6f8]">
+                <div className="flex min-h-screen flex-1 flex-col bg-white">
                   <div className="flex flex-1 flex-col">
                     {children}
                     <Footer />

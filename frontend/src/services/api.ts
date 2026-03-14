@@ -148,9 +148,17 @@ export interface ManuscriptListItem {
   created_at: string;
 }
 
+export interface AccessibleManuscriptListItem extends ManuscriptListItem {
+  access_mode: "submitted" | "reviewing" | "submitted_and_reviewing" | "admin";
+}
+
 export const manuscriptsApi = {
   my: (params?: { page?: number; page_size?: number; status?: string; keyword?: string }) =>
     request<{ items: ManuscriptListItem[]; total: number }>("manuscripts/my", {
+      params: params ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) : undefined,
+    }),
+  accessibleForAiDetect: (params?: { page?: number; page_size?: number; keyword?: string }) =>
+    request<{ items: AccessibleManuscriptListItem[]; total: number }>("manuscripts/accessible-for-ai-detect", {
       params: params ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) : undefined,
     }),
   get: (id: number) => request<Record<string, unknown>>(`manuscripts/${id}`),
@@ -177,6 +185,15 @@ export const manuscriptsApi = {
     const fd = new FormData();
     fd.append("file", file);
     return request<{ text: string }>("manuscripts/extract-text", { method: "POST", body: fd });
+  },
+  /** 上传 Word/PDF 提取引注候选，用于引注转换工具（不落库） */
+  extractCitationsFromFile: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return request<{ citations: string[]; source: string; total: number }>("manuscripts/extract-citations", {
+      method: "POST",
+      body: fd,
+    });
   },
 };
 

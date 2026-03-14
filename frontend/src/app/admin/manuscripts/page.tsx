@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Card, Checkbox, Input, Modal, Select, Space, Table, Tag, message } from "antd";
+import { Button, Checkbox, Input, Modal, Select, Space, Table, Tag, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { REVIEW_STAGE_MAP, ROLE_MAP, STATUS_MAP } from "@/lib/constants";
 import { adminApi, type AdminManuscriptItem, type AdminUserItem, type SectionItem } from "@/services/api";
@@ -211,53 +211,56 @@ export default function AdminManuscriptsPage() {
   ];
 
   return (
-    <div>
-      <h1 className="text-xl font-bold text-[#333] mb-4">稿件总览</h1>
-      <Card size="small" className="mb-4">
-        <Space wrap>
-          <Input
-            placeholder="搜索编号/标题/作者邮箱"
-            allowClear
-            value={keyword}
-            onChange={(e) => {
-              setPage(1);
-              setKeyword(e.target.value);
-            }}
-            style={{ width: 260 }}
-          />
-          <Select
-            placeholder="状态"
-            allowClear
-            value={statusFilter || undefined}
-            onChange={(v) => {
-              setPage(1);
-              setStatusFilter(v ?? "");
-            }}
-            style={{ width: 150 }}
-            options={Object.entries(STATUS_MAP).map(([value, label]) => ({ value, label }))}
-          />
-          <Select
-            placeholder="栏目"
-            allowClear
-            value={sectionFilter || undefined}
-            onChange={(v) => {
-              setPage(1);
-              setSectionFilter(v ?? "");
-            }}
-            style={{ width: 180 }}
-            options={sections.map((s) => ({ value: String(s.id), label: s.name }))}
-          />
-        </Space>
-      </Card>
-      <Table
-        rowKey="id"
-        columns={columns}
-        dataSource={list}
-        loading={loading}
-        pagination={{ current: page, pageSize, total, onChange: setPage }}
-        size="small"
-        scroll={{ x: "max-content" }}
-      />
+    <div className="bg-white min-h-screen text-[#1d1d1f] p-4 sm:p-6 lg:p-8 w-full max-w-[1400px] mx-auto">
+      <h1 className="text-2xl font-medium text-gray-900 mb-6">稿件总览与分配</h1>
+      
+      <div className="bg-gray-50 border border-[#e5e7eb] rounded-sm p-4 mb-6 shadow-sm flex flex-wrap gap-4 items-center">
+        <Input
+          placeholder="搜索编号 / 标题 / 作者邮箱"
+          allowClear
+          value={keyword}
+          onChange={(e) => {
+            setPage(1);
+            setKeyword(e.target.value);
+          }}
+          className="w-full sm:w-auto min-w-[260px] rounded-sm"
+        />
+        <Select
+          placeholder="审稿状态"
+          allowClear
+          value={statusFilter || undefined}
+          onChange={(v) => {
+            setPage(1);
+            setStatusFilter(v ?? "");
+          }}
+          className="w-full sm:w-[150px]"
+          options={Object.entries(STATUS_MAP).map(([value, label]) => ({ value, label }))}
+        />
+        <Select
+          placeholder="所属栏目"
+          allowClear
+          value={sectionFilter || undefined}
+          onChange={(v) => {
+            setPage(1);
+            setSectionFilter(v ?? "");
+          }}
+          className="w-full sm:w-[180px]"
+          options={sections.map((s) => ({ value: String(s.id), label: s.name }))}
+        />
+      </div>
+
+      <div className="border border-[#e5e7eb] rounded-sm overflow-hidden bg-white shadow-sm">
+        <Table<AdminManuscriptItem>
+          rowKey="id"
+          columns={columns}
+          dataSource={list}
+          loading={loading}
+          pagination={{ current: page, pageSize, total, onChange: setPage, className: "!mt-4 !mb-4 !mr-4" }}
+          size="middle"
+          scroll={{ x: "max-content" }}
+          rowClassName="hover:bg-gray-50 transition-colors"
+        />
+      </div>
 
       <Modal
         title="提交退修意见"

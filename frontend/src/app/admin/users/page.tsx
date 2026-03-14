@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Form, Input, Modal, Select, Space, Table, Tag, message } from "antd";
+import { Button, Form, Input, Modal, Select, Space, Table, Tag, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { adminApi, type AdminUserItem } from "@/services/api";
 import { ROLE_MAP } from "@/lib/constants";
@@ -133,44 +133,49 @@ export default function AdminUsersPage() {
   ];
 
   return (
-    <div>
-      <h1 className="text-xl font-bold text-[#333] mb-4">用户管理</h1>
-      <Card size="small" className="mb-4">
-        <Space wrap>
-          <Input
-            placeholder="搜索邮箱/姓名"
-            allowClear
-            value={keyword}
-            onChange={(e) => {
-              setPage(1);
-              setKeyword(e.target.value);
-            }}
-            style={{ width: 220 }}
-          />
-          <Select placeholder="角色" allowClear value={roleFilter || undefined} onChange={(v) => { setPage(1); setRoleFilter(v ?? ""); }} style={{ width: 100 }}>
-            <Select.Option value="author">作者</Select.Option>
-            <Select.Option value="internal_reviewer">内审</Select.Option>
-            <Select.Option value="external_reviewer">外审</Select.Option>
-            <Select.Option value="editor">编辑</Select.Option>
-            <Select.Option value="admin">管理员</Select.Option>
-          </Select>
-          <Select placeholder="状态" allowClear value={activeFilter || undefined} onChange={(v) => { setPage(1); setActiveFilter(v ?? ""); }} style={{ width: 100 }}>
-            <Select.Option value="true">启用</Select.Option>
-            <Select.Option value="false">停用</Select.Option>
-          </Select>
-          <Button type="primary" onClick={() => setCreateModalOpen(true)} className="!bg-[#8B1538] hover:!bg-[#70122e]">
-            新建用户
-          </Button>
-        </Space>
-      </Card>
-      <Table
-        rowKey="id"
-        columns={columns}
-        dataSource={list}
-        loading={loading}
-        pagination={{ current: page, pageSize, total, onChange: setPage }}
-        size="small"
-      />
+    <div className="bg-white min-h-screen text-[#1d1d1f] p-4 sm:p-6 lg:p-8 w-full max-w-[1400px] mx-auto">
+      <h1 className="text-2xl font-medium text-gray-900 mb-6">用户管理</h1>
+      
+      <div className="bg-gray-50 border border-[#e5e7eb] rounded-sm p-4 mb-6 shadow-sm flex flex-wrap gap-4 items-center">
+        <Input
+          placeholder="搜索邮箱 / 姓名"
+          allowClear
+          value={keyword}
+          onChange={(e) => {
+            setPage(1);
+            setKeyword(e.target.value);
+          }}
+          className="w-full sm:w-auto min-w-[220px] rounded-sm"
+        />
+        <Select placeholder="筛选角色" allowClear value={roleFilter || undefined} onChange={(v) => { setPage(1); setRoleFilter(v ?? ""); }} className="w-full sm:w-[120px]">
+          <Select.Option value="author">作者</Select.Option>
+          <Select.Option value="internal_reviewer">内审</Select.Option>
+          <Select.Option value="external_reviewer">外审</Select.Option>
+          <Select.Option value="editor">编辑</Select.Option>
+          <Select.Option value="admin">管理员</Select.Option>
+        </Select>
+        <Select placeholder="筛选状态" allowClear value={activeFilter || undefined} onChange={(v) => { setPage(1); setActiveFilter(v ?? ""); }} className="w-full sm:w-[120px]">
+          <Select.Option value="true">启用</Select.Option>
+          <Select.Option value="false">停用</Select.Option>
+        </Select>
+        <div className="flex-grow"></div>
+        <Button type="primary" onClick={() => setCreateModalOpen(true)} className="bg-[#8B1538] hover:!bg-[#A51D45] border-none shadow-sm rounded-sm">
+          新建用户账户
+        </Button>
+      </div>
+
+      <div className="border border-[#e5e7eb] rounded-sm overflow-hidden bg-white shadow-sm">
+        <Table<AdminUserItem>
+          rowKey="id"
+          columns={columns}
+          dataSource={list}
+          loading={loading}
+          pagination={{ current: page, pageSize, total, onChange: setPage, className: "!mt-4 !mb-4 !mr-4" }}
+          size="middle"
+          scroll={{ x: "max-content" }}
+          rowClassName="hover:bg-gray-50 transition-colors"
+        />
+      </div>
 
       <Modal title="新建用户" open={createModalOpen} onCancel={() => setCreateModalOpen(false)} footer={null} destroyOnClose>
         <Form form={form} layout="vertical" onFinish={handleCreate}>

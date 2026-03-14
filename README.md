@@ -94,6 +94,7 @@ chmod +x scripts/start.sh   # 只需执行一次
 | `DASHSCOPE_API_KEY` | 阿里云百炼 API Key（AI 初审报告） | 空 |
 | `LLM_BASE_URL` | 大模型接口地址 | 华北2 百炼兼容地址 |
 | `LLM_MODEL` | 模型名 | `qwen3.5-plus` |
+| `EASY_SCHOLAR_SECRET` | EasyScholar 期刊级别查询密钥（引注评级） | 空 |
 
 详见 `backend/.env.example`。前端可选配置见 `frontend/.env.example`（如生产直连后端时设置 `NEXT_PUBLIC_API_URL`）。
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Card, Form, Input, Modal, Space, Table, message } from "antd";
+import { Button, Form, Input, Modal, Space, Table, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { adminApi, type SectionItem } from "@/services/api";
 
@@ -63,14 +63,26 @@ export default function AdminSectionsPage() {
   ];
 
   return (
-    <div>
-      <h1 className="text-xl font-bold text-[#333] mb-4">栏目管理</h1>
-      <Card size="small" className="mb-4">
-        <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setModalOpen(true); }} className="!bg-[#8B1538] hover:!bg-[#70122e]">
-          新增栏目
+    <div className="bg-white min-h-screen text-[#1d1d1f] p-4 sm:p-6 lg:p-8 w-full max-w-[1400px] mx-auto">
+      <h1 className="text-2xl font-medium text-gray-900 mb-6">栏目管理</h1>
+      
+      <div className="bg-gray-50 border border-[#e5e7eb] rounded-sm p-4 mb-6 shadow-sm flex items-center">
+        <Button type="primary" onClick={() => { setEditing(null); form.resetFields(); setModalOpen(true); }} className="bg-[#8B1538] hover:!bg-[#A51D45] border-none shadow-sm rounded-sm">
+          新增栏目分类
         </Button>
-      </Card>
-      <Table rowKey="id" columns={columns} dataSource={list} loading={loading} size="small" />
+      </div>
+      
+      <div className="border border-[#e5e7eb] rounded-sm overflow-hidden bg-white shadow-sm">
+        <Table 
+          rowKey="id" 
+          columns={columns} 
+          dataSource={list} 
+          loading={loading} 
+          size="middle"
+          pagination={{ className: "!mt-4 !mb-4 !mr-4" }}
+          rowClassName="hover:bg-gray-50 transition-colors" 
+        />
+      </div>
 
       <Modal title={editing ? "编辑栏目" : "新增栏目"} open={modalOpen} onCancel={() => { setModalOpen(false); setEditing(null); }} footer={null} destroyOnClose>
         <Form form={form} layout="vertical" onFinish={handleFinish}>

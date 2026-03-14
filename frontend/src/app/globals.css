@@ -44,8 +44,8 @@ body {
 body {
   margin: 0;
   font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 15px;
+  line-height: 1.55;
   background-color: var(--page-bg);
   position: relative;
 }
@@ -91,18 +91,82 @@ body {
 
 .site-header-menu.ant-menu-horizontal > .ant-menu-item,
 .site-header-menu.ant-menu-horizontal > .ant-menu-submenu {
-  padding-inline: 16px;
+  padding-inline: 14px;
 }
 
 .site-header-menu.ant-menu-horizontal > .ant-menu-item::after,
 .site-header-menu.ant-menu-horizontal > .ant-menu-submenu::after {
-  inset-inline: 16px !important;
+  inset-inline: 14px !important;
+}
+
+.ant-card .ant-card-head {
+  min-height: 46px;
+  padding: 0 16px;
+}
+
+.ant-card .ant-card-body {
+  padding: 16px;
+}
+
+.ant-form-item {
+  margin-bottom: 16px;
+}
+
+.ant-form-vertical .ant-form-item-label {
+  padding-bottom: 4px;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th,
+.ant-table-wrapper .ant-table-tbody > tr > td {
+  padding: 10px 12px;
+}
+
+.ant-divider-horizontal {
+  margin: 16px 0;
+}
+
+.ai-detect-upload.ant-upload-wrapper {
+  width: 100%;
+}
+
+.ai-detect-upload.ant-upload-wrapper .ant-upload-drag {
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.ai-detect-upload.ant-upload-wrapper .ant-upload-btn {
+  display: block !important;
+  height: auto !important;
+  padding: 0 !important;
+}
+
+.ai-detect-upload.ant-upload-wrapper .ant-upload-drag-container {
+  display: block !important;
+}
+
+.ai-detect-upload-panel {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 220px;
+  border: 1px dashed #d1d5db;
+  border-radius: 2px;
+  background: #fff;
+  padding: 48px 24px;
+  text-align: center;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.ai-detect-upload.ant-upload-wrapper .ant-upload-drag:hover .ai-detect-upload-panel,
+.ai-detect-upload.ant-upload-wrapper .ant-upload-drag.ant-upload-drag-hover .ai-detect-upload-panel {
+  border-color: #8b1538;
+  background: #fffdfd;
 }
 
 .markdown-content {
   color: #333;
-  font-size: 1rem;
-  line-height: 1.75;
+  font-size: 0.95rem;
+  line-height: 1.65;
   word-break: break-word;
 }
 

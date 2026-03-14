@@ -30,6 +30,10 @@ class ManuscriptListItem(BaseModel):
         from_attributes = True
 
 
+class AccessibleManuscriptListItem(ManuscriptListItem):
+    access_mode: str
+
+
 class ManuscriptVersionBrief(BaseModel):
     id: int
     version_number: int

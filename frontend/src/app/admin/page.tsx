@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Card, Col, Descriptions, Empty, List, Row, Space, Spin, Statistic, Table, Tag, Typography } from "antd";
+import { Button, Col, Descriptions, Empty, List, Row, Space, Spin, Statistic, Table, Tag, Typography, Divider } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
   adminApi,
@@ -239,217 +239,215 @@ export default function AdminDashboardPage() {
 
   if (!stats) {
     return (
-      <Card styles={{ body: { padding: 28 } }}>
-        <Space direction="vertical" size={16}>
-          <Title level={4} className="!mb-0 !text-[#1f2937]">
+      <div className="bg-white p-8 sm:p-12 min-h-[50vh] flex flex-col justify-center border border-[#e5e7eb] rounded-sm m-6">
+        <Space direction="vertical" size={16} className="max-w-xl mx-auto text-center">
+          <div className="text-4xl mb-2">⚠️</div>
+          <Title level={3} className="!mb-0 !text-gray-900 !font-medium">
             管理数据加载失败
           </Title>
-          <Paragraph className="!mb-0 !text-[15px] !leading-7 !text-[#667085]">
-            当前未能获取仪表盘统计信息，请重试后继续查看稿件、用户和流程数据。
+          <Paragraph className="!text-base !leading-relaxed !text-gray-500">
+            当前未能获取仪表盘统计信息，请检查网络或后端服务后重试。
           </Paragraph>
-          <div>
-            <Button type="primary" onClick={load}>
-              重新加载
+          <div className="mt-4">
+            <Button type="primary" size="large" onClick={load} className="bg-[#8B1538] hover:!bg-[#A51D45] border-none shadow-sm px-8 rounded-sm">
+              重新加载 Dashboard
             </Button>
           </div>
         </Space>
-      </Card>
+      </div>
     );
   }
 
   return (
-    <Space direction="vertical" size={24} className="flex w-full">
-      <Card styles={{ body: { padding: 28 } }}>
-        <Row gutter={[24, 24]} align="middle">
-          <Col xs={24} xl={15}>
-            <Text className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8B1538]">
+    <div className="bg-white w-full max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8 space-y-10 min-h-screen text-[#1d1d1f]">
+      {/* Header Section */}
+      <section className="pb-6 border-b border-[#e5e7eb]">
+        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">
+          <div className="max-w-3xl">
+            <Text className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8B1538] mb-2 block">
               Admin Console
             </Text>
-            <Title level={2} className="!mb-2 !mt-3 !text-[#1f2937]">
+            <Title level={1} className="!mb-3 !font-medium !text-[#1f2937]">
               管理仪表盘
             </Title>
-            <Paragraph className="!mb-0 !max-w-3xl !text-[15px] !leading-8 !text-[#667085]">
-              统一查看稿件积压、用户结构、栏目配置和最近处理记录。这里保留现有业务逻辑，只把后台首页收回到 Ant Design
-              的工作台式布局，方便继续逐页迁移。
+            <Paragraph className="!mb-0 !text-[15px] !leading-relaxed !text-[#6b7280]">
+              统一查看稿件积压、用户结构、栏目配置和最近处理记录。保留现有业务逻辑，后台首页同样回归无卡片的扁平化结构。
             </Paragraph>
-          </Col>
-          <Col xs={24} xl={9}>
-            <Card size="small" styles={{ body: { padding: 20 } }}>
-              <Descriptions
-                column={1}
-                size="small"
-                items={[
-                  { key: "pending", label: "当前待处理稿件", children: `${stats.manuscripts_pending} 篇` },
-                  { key: "users", label: "系统用户总数", children: `${totalUsers} 人` },
-                  { key: "sections", label: "栏目配置数", children: `${stats.sections_count} 个` },
-                  { key: "templates", label: "退修模板数", children: `${stats.templates_count} 个` },
-                ]}
+          </div>
+          <div className="bg-gray-50 border border-[#e5e7eb] rounded-sm p-4 text-sm flex gap-6 shrink-0 shadow-sm">
+             <div className="space-y-3 pr-6 border-r border-gray-200">
+                <div className="flex justify-between gap-4"><span className="text-gray-500">待处理稿件:</span><span className="font-medium">{stats.manuscripts_pending} 篇</span></div>
+                <div className="flex justify-between gap-4"><span className="text-gray-500">系统总用户:</span><span className="font-medium">{totalUsers} 人</span></div>
+             </div>
+             <div className="space-y-3">
+                <div className="flex justify-between gap-4"><span className="text-gray-500">栏目配置数:</span><span className="font-medium">{stats.sections_count} 个</span></div>
+                <div className="flex justify-between gap-4"><span className="text-gray-500">退修模板数:</span><span className="font-medium">{stats.templates_count} 个</span></div>
+             </div>
+             <div className="flex flex-col justify-end gap-2 ml-4 border-l border-gray-200 pl-6">
+               <Link href="/admin/manuscripts">
+                 <Button type="primary" size="small" className="w-full bg-[#8B1538] hover:!bg-[#A51D45] border-none shadow-sm rounded-sm">稿件总览</Button>
+               </Link>
+               <Button size="small" className="w-full rounded-sm" onClick={load}>刷新数据</Button>
+             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Statistics Section */}
+      <section>
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+            <div className="bg-gray-50 border border-[#e5e7eb] p-5 rounded-sm shadow-sm flex flex-col justify-center">
+              <Statistic title={<span className="text-gray-500 text-sm mb-1 block">全站稿件总数</span>} value={stats.manuscripts_total} valueStyle={{ fontSize: '28px', fontWeight: 600, color: '#111827' }} />
+            </div>
+            <div className="bg-red-50 border border-red-100 p-5 rounded-sm shadow-sm flex flex-col justify-center relative overflow-hidden">
+               <div className="absolute -right-4 -top-4 w-16 h-16 bg-red-100 rounded-full opacity-50"></div>
+              <Statistic title={<span className="text-red-800/70 text-sm mb-1 block font-medium">积压待办稿件</span>} value={stats.manuscripts_pending} valueStyle={{ fontSize: '28px', fontWeight: 600, color: '#8B1538' }} />
+            </div>
+            <div className="bg-gray-50 border border-[#e5e7eb] p-5 rounded-sm shadow-sm flex flex-col justify-center">
+              <Statistic title={<span className="text-gray-500 text-sm mb-1 block">收录总栏目数</span>} value={stats.sections_count} valueStyle={{ fontSize: '28px', fontWeight: 600, color: '#111827' }} />
+            </div>
+            <div className="bg-gray-50 border border-[#e5e7eb] p-5 rounded-sm shadow-sm flex flex-col justify-center">
+              <Statistic title={<span className="text-gray-500 text-sm mb-1 block">预设退修模板</span>} value={stats.templates_count} valueStyle={{ fontSize: '28px', fontWeight: 600, color: '#111827' }} />
+            </div>
+            <div className="bg-gray-50 border border-[#e5e7eb] p-5 rounded-sm shadow-sm flex flex-col justify-center">
+              <Statistic title={<span className="text-gray-500 text-sm mb-1 block">作者基数</span>} value={stats.users_by_role?.author ?? 0} valueStyle={{ fontSize: '28px', fontWeight: 600, color: '#111827' }} />
+            </div>
+            <div className="bg-blue-50 border border-blue-100 p-5 rounded-sm shadow-sm flex flex-col justify-center relative overflow-hidden">
+               <div className="absolute -right-4 -top-4 w-16 h-16 bg-blue-100 rounded-full opacity-50"></div>
+              <Statistic 
+                title={<span className="text-blue-800/70 text-sm mb-1 block font-medium">编辑专家梯队</span>} 
+                value={(stats.users_by_role?.internal_reviewer ?? 0) + (stats.users_by_role?.external_reviewer ?? 0) + (stats.users_by_role?.editor ?? 0)} 
+                valueStyle={{ fontSize: '28px', fontWeight: 600, color: '#1d4ed8' }} 
               />
-              <Space wrap className="mt-4">
-                <Link href="/admin/manuscripts">
-                  <Button type="primary">进入稿件总览</Button>
-                </Link>
-                <Button onClick={load}>刷新数据</Button>
-              </Space>
-            </Card>
-          </Col>
-        </Row>
-      </Card>
+            </div>
+        </div>
+      </section>
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} md={8}>
-          <Card styles={{ body: { padding: 24 } }}>
-            <Statistic title="稿件总数" value={stats.manuscripts_total} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8}>
-          <Card styles={{ body: { padding: 24 } }}>
-            <Statistic title="待处理稿件" value={stats.manuscripts_pending} valueStyle={{ color: "#8B1538" }} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8}>
-          <Card styles={{ body: { padding: 24 } }}>
-            <Statistic title="栏目数" value={stats.sections_count} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8}>
-          <Card styles={{ body: { padding: 24 } }}>
-            <Statistic title="退修模板数" value={stats.templates_count} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8}>
-          <Card styles={{ body: { padding: 24 } }}>
-            <Statistic title="作者" value={stats.users_by_role?.author ?? 0} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8}>
-          <Card styles={{ body: { padding: 24 } }}>
-            <Statistic
-              title="内审 / 外审 / 编辑"
-              value={(stats.users_by_role?.internal_reviewer ?? 0) + (stats.users_by_role?.external_reviewer ?? 0) + (stats.users_by_role?.editor ?? 0)}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      <Row gutter={[16, 16]}>
-        <Col xs={24} xl={14}>
-          <Card
-            title="状态看板"
-            extra={<Text className="text-[13px] text-[#667085]">按稿件状态汇总当前工作量</Text>}
-          >
-            {statusEntries.length === 0 ? (
-              <Empty description="暂无稿件数据" />
-            ) : (
-              <List
-                grid={{ gutter: 12, xs: 1, sm: 2, lg: 3 }}
-                dataSource={statusEntries}
-                renderItem={([status, count]) => (
-                  <List.Item>
-                    <Link href={`/admin/manuscripts?status=${encodeURIComponent(status)}`} className="block">
-                      <Card size="small" styles={{ body: { padding: 18 } }}>
-                        <Space direction="vertical" size={10} className="flex w-full">
-                          <Tag color={getStatusTagColor(status)} className="m-0 w-fit">
-                            {STATUS_MAP[status] ?? status}
-                          </Tag>
-                          <Text className="text-[28px] font-semibold text-[#1f2937]">{count}</Text>
-                          <Text className="text-[13px] text-[#667085]">查看该状态下的稿件列表</Text>
-                        </Space>
-                      </Card>
+      {/* Main Boards Section */}
+      <section className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-8">
+          <div className="flex flex-col">
+             <div className="flex items-center justify-between mb-4 border-b border-[#e5e7eb] pb-2">
+                <Title level={4} className="!m-0 !font-medium text-gray-900 border-l-4 border-[#8B1538] pl-3">状态分布看板</Title>
+                <Text className="text-sm text-gray-500">按状态汇总当前实况</Text>
+             </div>
+             
+             {statusEntries.length === 0 ? (
+               <div className="bg-gray-50 border border-dashed border-gray-300 rounded-sm py-16 text-center text-gray-400">
+                  <Empty description="暂无细分稿件状态分布" />
+               </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {statusEntries.map(([status, count]) => (
+                    <Link key={status} href={`/admin/manuscripts?status=${encodeURIComponent(status)}`} className="block group">
+                      <div className="bg-white border border-[#e5e7eb] p-5 rounded-sm shadow-sm transition-all group-hover:border-gray-400 group-hover:shadow-md h-full flex flex-col justify-between">
+                          <Tag color={getStatusTagColor(status)} className="m-0 w-fit mb-4">{STATUS_MAP[status] ?? status}</Tag>
+                          <div>
+                            <div className="text-3xl font-semibold text-gray-900 mb-1">{count} <span className="text-sm font-normal text-gray-400">篇</span></div>
+                            <div className="text-xs text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">点击检索该状态列表 →</div>
+                          </div>
+                      </div>
                     </Link>
-                  </List.Item>
-                )}
-              />
-            )}
-          </Card>
-        </Col>
-        <Col xs={24} xl={10}>
-          <Card title="快捷入口" extra={<Text className="text-[13px] text-[#667085]">常用后台入口</Text>}>
-            <List
-              dataSource={quickEntries}
-              renderItem={(item) => (
-                <List.Item>
-                  <Link href={item.key} className="block w-full">
-                    <Card size="small" styles={{ body: { padding: 18 } }}>
-                      <Space direction="vertical" size={8} className="flex w-full">
-                        <Space className="w-full justify-between">
-                          <Text strong className="text-[#1f2937]">
-                            {item.title}
-                          </Text>
-                          <Tag className="m-0">
-                            {item.value} {item.suffix}
-                          </Tag>
-                        </Space>
-                        <Text className="text-[14px] leading-7 text-[#667085]">{item.desc}</Text>
-                        <Text className="text-[13px] text-[#8B1538]">进入该模块</Text>
-                      </Space>
-                    </Card>
-                  </Link>
-                </List.Item>
+                  ))}
+                </div>
               )}
-            />
-          </Card>
-        </Col>
-      </Row>
+          </div>
+          
+          <div className="flex flex-col">
+             <div className="flex items-center justify-between mb-4 border-b border-[#e5e7eb] pb-2">
+                <Title level={4} className="!m-0 !font-medium text-gray-900">核心模块跳转</Title>
+             </div>
+             <div className="space-y-3">
+               {quickEntries.map((item) => (
+                  <Link key={item.key} href={item.key} className="block group">
+                    <div className="bg-white border border-[#e5e7eb] p-5 rounded-sm shadow-sm transition-colors group-hover:bg-gray-50 flex flex-col gap-2">
+                      <div className="flex justify-between items-center w-full">
+                         <span className="font-semibold text-gray-900 group-hover:text-[#8B1538] transition-colors">{item.title}</span>
+                         <span className="bg-gray-100 text-gray-700 text-xs px-2.5 py-1 rounded-sm border border-gray-200">{item.value} {item.suffix}</span>
+                      </div>
+                      <div className="text-sm text-gray-500 mt-1">{item.desc}</div>
+                    </div>
+                  </Link>
+                ))}
+             </div>
+          </div>
+      </section>
 
-      <Card
-        title="待处理稿件"
-        extra={<Link href="/admin/manuscripts">查看全部</Link>}
-      >
-        {pendingList.length === 0 ? (
-          <Empty description="暂无待处理稿件" />
-        ) : (
-          <Table<AdminManuscriptItem>
-            rowKey="id"
-            columns={pendingColumns}
-            dataSource={pendingList}
-            pagination={false}
-            size="small"
-            scroll={{ x: "max-content" }}
-          />
-        )}
-      </Card>
+      {/* Tables Section */}
+      <section className="space-y-12">
+        <div>
+           <div className="flex items-center justify-between mb-4 border-b border-[#e5e7eb] pb-3">
+              <Title level={4} className="!m-0 !font-medium text-gray-900 border-l-4 border-orange-500 pl-3">待处理积压大盘</Title>
+              <Link href="/admin/manuscripts" className="text-sm text-blue-600 hover:text-blue-800">查阅所有排队记录</Link>
+           </div>
+          {pendingList.length === 0 ? (
+            <div className="border border-dashed border-gray-200 py-12 rounded-sm bg-gray-50/50">
+              <Empty description="可喜可贺，当前暂无任何待处积压" />
+            </div>
+          ) : (
+            <div className="border border-[#e5e7eb] rounded-sm overflow-hidden shadow-sm bg-white">
+               <Table<AdminManuscriptItem>
+                  rowKey="id"
+                  columns={pendingColumns}
+                  dataSource={pendingList}
+                  pagination={false}
+                  size="middle"
+                  scroll={{ x: "max-content" }}
+                  rowClassName="hover:bg-gray-50 transition-colors"
+               />
+            </div>
+          )}
+        </div>
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} xl={12}>
-          <Card
-            title="最近注册用户"
-            extra={<Link href="/admin/users">进入用户管理</Link>}
-          >
-            {recentUsers.length === 0 ? (
-              <Empty description="暂无用户数据" />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+           <div>
+             <div className="flex items-center justify-between mb-4 border-b border-[#e5e7eb] pb-3">
+                <Title level={4} className="!m-0 !font-medium text-gray-900">近期新注册账单</Title>
+                <Link href="/admin/users" className="text-sm text-blue-600 hover:text-blue-800">管理全部用户</Link>
+             </div>
+             {recentUsers.length === 0 ? (
+              <div className="border border-dashed border-gray-200 py-12 rounded-sm bg-gray-50/50">
+                <Empty description="暂无新注册活跃反馈" />
+              </div>
             ) : (
-              <Table<AdminUserItem>
-                rowKey="id"
-                columns={recentUsersColumns}
-                dataSource={recentUsers}
-                pagination={false}
-                size="small"
-                scroll={{ x: "max-content" }}
-              />
+              <div className="border border-[#e5e7eb] rounded-sm overflow-hidden shadow-sm bg-white">
+                 <Table<AdminUserItem>
+                    rowKey="id"
+                    columns={recentUsersColumns}
+                    dataSource={recentUsers}
+                    pagination={false}
+                    size="small"
+                    scroll={{ x: "max-content" }}
+                    rowClassName="hover:bg-gray-50 transition-colors"
+                 />
+              </div>
             )}
-          </Card>
-        </Col>
-        <Col xs={24} xl={12}>
-          <Card
-            title="最近处理记录"
-            extra={<Link href="/admin/manuscripts">进入稿件总览</Link>}
-          >
-            {recentActions.length === 0 ? (
-              <Empty description="暂无处理记录" />
-            ) : (
-              <Table<AdminRecentActionItem>
-                rowKey="id"
-                columns={recentActionsColumns}
-                dataSource={recentActions}
-                pagination={false}
-                size="small"
-                scroll={{ x: "max-content" }}
-              />
-            )}
-          </Card>
-        </Col>
-      </Row>
-    </Space>
+           </div>
+
+           <div>
+             <div className="flex items-center justify-between mb-4 border-b border-[#e5e7eb] pb-3">
+                <Title level={4} className="!m-0 !font-medium text-gray-900 border-l-4 border-indigo-500 pl-3">全系统活跃快取</Title>
+                <Link href="/admin/manuscripts" className="text-sm text-blue-600 hover:text-blue-800">查看完整审批录</Link>
+             </div>
+             {recentActions.length === 0 ? (
+                <div className="border border-dashed border-gray-200 py-12 rounded-sm bg-gray-50/50">
+                  <Empty description="安静得出奇：暂无后台操作动作" />
+                </div>
+              ) : (
+                <div className="border border-[#e5e7eb] rounded-sm overflow-hidden shadow-sm bg-white">
+                   <Table<AdminRecentActionItem>
+                      rowKey="id"
+                      columns={recentActionsColumns}
+                      dataSource={recentActions}
+                      pagination={false}
+                      size="small"
+                      scroll={{ x: "max-content" }}
+                      rowClassName="hover:bg-gray-50 transition-colors"
+                   />
+                </div>
+              )}
+           </div>
+        </div>
+      </section>
+    </div>
   );
 }

@@ -5,16 +5,16 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Alert,
-  Button,
-  Card,
   Checkbox,
   Col,
   Descriptions,
   List,
+  Divider,
   Form,
   Input,
   Row,
   Select,
+  Button,
   Spin,
   Space,
   Tag,
@@ -300,331 +300,387 @@ export default function SubmitPage() {
   };
 
   return (
-    <div className="bg-[#f4f6f8] text-[#1d1d1f]">
+    <div className="bg-white text-[#1d1d1f] min-h-screen flex flex-col">
       <HeaderBar />
-      <main id="main-content" className="mx-auto w-full max-w-7xl px-4 pb-20 pt-8 sm:px-6 lg:px-8">
-        <Space direction="vertical" size={24} className="flex w-full">
-          <Card styles={{ body: { padding: 28 } }}>
-            <Row gutter={[24, 24]} align="middle">
-              <Col xs={24} lg={16}>
-                <Text className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8B1538]">
-                  Online Submission
-                </Text>
-                <Title level={2} className="!mb-2 !mt-3 !text-[#1f2937]">
-                  稿件投稿
-                </Title>
-                <Paragraph className="!mb-0 !max-w-3xl !text-[15px] !leading-8 !text-[#667085]">
-                  请填写稿件信息并上传文件。提交后可在作者中心查看状态、接收退修意见并上传修订稿。
-                </Paragraph>
-              </Col>
-              <Col xs={24} lg={8}>
-                <Space wrap>
-                  <Tag color="volcano">在线投稿</Tag>
-                  <Tag color="blue">状态跟踪</Tag>
-                  <Tag color="gold">退修回传</Tag>
-                </Space>
-              </Col>
-            </Row>
-          </Card>
+      <main id="main-content" className="flex-1 mx-auto w-full max-w-7xl px-4 pb-24 pt-12 sm:px-6 lg:px-8">
+        <Row gutter={[24, 24]} align="middle" className="mb-8">
+          <Col xs={24} lg={16}>
+            <Text className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8B1538]">
+              Online Submission
+            </Text>
+            <Title level={1} className="!mb-3 !mt-3 !font-medium !text-[#1f2937]">
+              稿件投稿
+            </Title>
+            <Paragraph className="!mb-0 !max-w-3xl !text-[16px] !leading-relaxed !text-[#667085]">
+              请填写稿件信息并上传文件。提交后可在作者中心查看状态、接收退修意见并上传修订稿。
+            </Paragraph>
+          </Col>
+          <Col xs={24} lg={8} className="text-left lg:text-right">
+            <Space wrap>
+              <Tag bordered={false} color="red" className="px-3 py-1 bg-red-50 text-[#8B1538]">在线投稿</Tag>
+              <Tag bordered={false} color="blue" className="px-3 py-1 bg-blue-50 text-blue-700">状态跟踪</Tag>
+              <Tag bordered={false} color="gold" className="px-3 py-1 bg-yellow-50 text-yellow-700">退修回传</Tag>
+            </Space>
+          </Col>
+        </Row>
 
-          <Row gutter={[24, 24]} align="top">
-            <Col xs={24} xl={17}>
-              <Form
-                form={form}
-                layout="vertical"
-                requiredMark={false}
-                onFinish={submit}
-                initialValues={{
-                  institution: user.institution || "",
-                }}
-              >
-                <Space direction="vertical" size={24} className="flex w-full">
-                  <Card title="稿件信息">
-                    <Row gutter={16}>
-                      <Col xs={24}>
-                        <Form.Item name="title" label="标题" rules={[{ required: true, message: "请输入标题" }]}>
-                          <Input size="large" placeholder="请输入标题" />
-                        </Form.Item>
-                      </Col>
-                      <Col xs={24}>
-                        <Form.Item name="abstract" label="摘要" rules={[{ required: true, message: "请输入摘要" }]}>
-                          <TextArea rows={7} showCount maxLength={1200} placeholder="请输入摘要" />
-                        </Form.Item>
-                      </Col>
-                      <Col xs={24} md={12}>
-                        <Form.Item name="keywords" label="关键词" rules={[{ required: true, message: "请输入关键词" }]}>
-                          <Input size="large" placeholder="多个关键词用逗号分隔" />
-                        </Form.Item>
-                      </Col>
-                      <Col xs={24} md={12}>
-                        <Form.Item name="planCategory" label="计划栏目" rules={[{ required: true, message: "请选择计划栏目" }]}>
-                          <Select size="large" placeholder="请选择" options={PLAN_OPTIONS} />
-                        </Form.Item>
-                      </Col>
-                      <Col xs={24} md={12}>
-                        <Form.Item name="contact" label="联系方式" rules={[{ required: true, message: "请输入联系方式" }]}>
-                          <Input size="large" placeholder="手机号或邮箱" />
-                        </Form.Item>
-                      </Col>
-                      <Col xs={24} md={12}>
-                        <Form.Item name="institution" label="单位">
-                          <Input size="large" placeholder="工作单位" />
-                        </Form.Item>
-                      </Col>
-                    </Row>
-                  </Card>
+        <Divider className="mb-12 border-[#e5e7eb]" />
 
-                  <Card title="上传文件">
-                    <Form.Item
-                      name="file"
-                      label="稿件文件"
-                      rules={[
-                        {
-                          required: true,
-                          message: "请上传稿件文件",
-                          validator: (_, value) =>
-                            value && Array.isArray(value) && value.length > 0
-                              ? Promise.resolve()
-                              : Promise.reject(new Error("请上传稿件文件")),
-                        },
-                      ]}
-                      valuePropName="fileList"
-                      getValueFromEvent={normFile}
+        <Row gutter={[48, 48]} align="top">
+          <Col xs={24} xl={16}>
+            <Form
+              form={form}
+              layout="vertical"
+              requiredMark={false}
+              onFinish={submit}
+              initialValues={{
+                institution: user.institution || "",
+              }}
+            >
+              <Space direction="vertical" size={48} className="flex w-full">
+                
+                {/* 稿件信息 */}
+                <section>
+                  <Title level={3} className="!mb-6 !font-normal !text-gray-900">稿件基本信息</Title>
+                  <Row gutter={24}>
+                    <Col xs={24}>
+                      <Form.Item name="title" label="标题" rules={[{ required: true, message: "请输入标题" }]}>
+                        <Input size="large" placeholder="请输入标题" className="rounded-sm" />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24}>
+                      <Form.Item name="abstract" label="摘要" rules={[{ required: true, message: "请输入摘要" }]}>
+                        <TextArea rows={6} showCount maxLength={1200} placeholder="请输入摘要" className="rounded-sm" />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={12}>
+                      <Form.Item name="keywords" label="关键词" rules={[{ required: true, message: "请输入关键词" }]}>
+                        <Input size="large" placeholder="多个关键词用逗号分隔" className="rounded-sm" />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={12}>
+                      <Form.Item name="planCategory" label="计划栏目" rules={[{ required: true, message: "请选择计划栏目" }]}>
+                        <Select size="large" placeholder="请选择" options={PLAN_OPTIONS} className="rounded-sm" />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={12}>
+                      <Form.Item name="contact" label="联系方式" rules={[{ required: true, message: "请输入联系方式" }]}>
+                        <Input size="large" placeholder="手机号或邮箱" className="rounded-sm" />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={12}>
+                      <Form.Item name="institution" label="单位">
+                        <Input size="large" placeholder="工作单位" className="rounded-sm" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </section>
+
+                <Divider className="!m-0 border-[#e5e7eb]" />
+
+                {/* 上传文件 */}
+                <section>
+                  <Title level={3} className="!mb-6 !font-normal !text-gray-900">文件上传</Title>
+                  <Form.Item
+                    name="file"
+                    rules={[
+                      {
+                        required: true,
+                        message: "请上传稿件文件",
+                        validator: (_, value) =>
+                          value && Array.isArray(value) && value.length > 0
+                            ? Promise.resolve()
+                            : Promise.reject(new Error("请上传稿件文件")),
+                      },
+                    ]}
+                    valuePropName="fileList"
+                    getValueFromEvent={normFile}
+                  >
+                    <Upload
+                      maxCount={1}
+                      beforeUpload={() => false}
+                      accept=".docx,.doc,.pdf"
+                      fileList={fileList}
+                      showUploadList={false}
+                      className="w-full block"
                     >
-                      <Upload
-                        maxCount={1}
-                        beforeUpload={() => false}
-                        accept=".docx,.doc,.pdf"
-                        fileList={fileList}
-                        showUploadList={false}
-                        className="w-full"
-                      >
-                        <Button icon={<UploadOutlined />} size="large">
-                          选择文件（.doc / .docx / .pdf）
-                        </Button>
-                      </Upload>
-                    </Form.Item>
+                      <Button icon={<UploadOutlined />} size="large" className="w-full text-left py-12 border-dashed border-2 bg-gray-50 hover:bg-gray-100 flex items-center justify-center flex-col gap-3 rounded-sm">
+                        <div className="text-gray-500 text-base">点击选择或拖拽文件到这里</div>
+                        <div className="text-gray-400 text-sm">支持 .doc / .docx / .pdf 格式，最大 {MAX_FILE_SIZE_MB}MB</div>
+                      </Button>
+                    </Upload>
+                  </Form.Item>
 
-                    <Descriptions bordered size="small" column={{ xs: 1, md: 2 }}>
-                      <Descriptions.Item label="文件名">{selectedFile?.name || "未选择"}</Descriptions.Item>
-                      <Descriptions.Item label="文件大小">{formatBytes(selectedFile?.size)}</Descriptions.Item>
-                      <Descriptions.Item label="文件类型">
+                  <div className="mt-6 bg-gray-50 p-5 rounded-sm border border-[#e5e7eb]">
+                    <Descriptions size="small" column={{ xs: 1, md: 2 }} className="mb-0">
+                      <Descriptions.Item label={<span className="text-gray-500">文件名</span>}>{selectedFile?.name || "未选择"}</Descriptions.Item>
+                      <Descriptions.Item label={<span className="text-gray-500">文件大小</span>}>{formatBytes(selectedFile?.size)}</Descriptions.Item>
+                      <Descriptions.Item label={<span className="text-gray-500">文件类型</span>}>
                         {selectedFile ? selectedFile.name.split(".").pop()?.toUpperCase() : "-"}
                       </Descriptions.Item>
-                      <Descriptions.Item label="大小限制">{MAX_FILE_SIZE_MB}MB</Descriptions.Item>
                     </Descriptions>
+                  </div>
 
-                    {previewError && <Alert message={previewError} type="warning" showIcon className="mt-4" />}
+                  {previewError && <Alert message={previewError} type="warning" showIcon className="mt-6" />}
 
-                    {previewType && (
-                      <div className="mt-6">
-                        <Text className="mb-3 block text-sm font-medium text-[#1d1d1f]">提交前预览</Text>
-                        {previewType === "pdf" && previewUrl && (
-                          <iframe
-                            src={previewUrl}
-                            title="PDF 预览"
-                            className="h-[520px] w-full rounded-lg border border-[#dedee3] bg-white"
-                          />
-                        )}
-                        {previewType === "docx" && (
-                          <div className="max-h-[520px] overflow-y-auto rounded-lg border border-[#dedee3] bg-white p-4 text-sm leading-7 text-[#2c2c2e]">
-                            {docxPreviewText ? (
-                              <pre className="whitespace-pre-wrap font-sans">{docxPreviewText}</pre>
-                            ) : (
-                              <Text type="secondary">正在解析 DOCX 预览...</Text>
-                            )}
-                          </div>
-                        )}
-                        {previewType === "doc" && (
-                          <Alert
-                            message="已选择 .doc 文件，可直接提交。由于浏览器限制，暂不支持 .doc 在线预览。"
-                            type="info"
-                            showIcon
-                          />
-                        )}
+                  {previewType && (
+                    <div className="mt-8">
+                      <Text className="mb-4 block text-[15px] font-medium text-[#1d1d1f]">提交前预览</Text>
+                      {previewType === "pdf" && previewUrl && (
+                        <iframe
+                          src={previewUrl}
+                          title="PDF 预览"
+                          className="h-[600px] w-full border border-[#e5e7eb] rounded-sm bg-white shadow-sm"
+                        />
+                      )}
+                      {previewType === "docx" && (
+                        <div className="max-h-[600px] overflow-y-auto rounded-sm border border-[#e5e7eb] shadow-sm bg-white p-6 text-[15px] leading-relaxed text-[#2c2c2e]">
+                          {docxPreviewText ? (
+                            <pre className="whitespace-pre-wrap font-sans">{docxPreviewText}</pre>
+                          ) : (
+                            <Text type="secondary">正在解析 DOCX 预览...</Text>
+                          )}
+                        </div>
+                      )}
+                      {previewType === "doc" && (
+                        <Alert
+                          message="已选择 .doc 文件，可直接提交。由于浏览器限制，暂不支持 .doc 在线预览。"
+                          type="info"
+                          showIcon
+                        />
+                      )}
+                    </div>
+                  )}
+                </section>
+
+                <Divider className="!m-0 border-[#e5e7eb]" />
+
+                {/* 基金与作者信息 */}
+                <section>
+                   <div className="flex items-center justify-between mb-6">
+                      <Title level={3} className="!mb-0 !font-normal !text-gray-900">基金信息与作者署名</Title>
+                   </div>
+                   
+                   <div className="mb-10">
+                      <div className="flex items-center justify-between mb-4">
+                        <Text strong className="text-[15px]">基金资助情况</Text>
+                        <Space>
+                          <Checkbox checked={noFund} onChange={(e) => setNoFund(e.target.checked)}>无基金信息</Checkbox>
+                        </Space>
                       </div>
-                    )}
-                  </Card>
+                      
+                      {!noFund && (
+                        <>
+                          <div className="mb-4 overflow-x-auto rounded-sm border border-[#e5e7eb]">
+                            <div className="min-w-[980px]">
+                              <div className="grid grid-cols-[70px_120px_140px_150px_120px_150px_150px_110px_70px] bg-gray-50 text-center text-sm font-medium text-gray-700">
+                                <div className="border-r border-[#e5e7eb] py-3">序号</div>
+                                <div className="border-r border-[#e5e7eb] py-3">项目号</div>
+                                <div className="border-r border-[#e5e7eb] py-3">项目名称</div>
+                                <div className="border-r border-[#e5e7eb] py-3">立项单位/部门</div>
+                                <div className="border-r border-[#e5e7eb] py-3">项目类别</div>
+                                <div className="border-r border-[#e5e7eb] py-3">项目英文</div>
+                                <div className="border-r border-[#e5e7eb] py-3">基金名称</div>
+                                <div className="border-r border-[#e5e7eb] py-3">项目备注</div>
+                                <div className="py-3">操作</div>
+                              </div>
+                              {fundRows.map((row, idx) => (
+                                <div
+                                  key={row.id}
+                                  className="grid grid-cols-[70px_120px_140px_150px_120px_150px_150px_110px_70px] border-t border-[#e5e7eb] group hover:bg-gray-50 transition-colors"
+                                >
+                                  <div className="border-r border-[#e5e7eb] px-2 py-3 text-center text-sm text-gray-500">{idx + 1}</div>
+                                  <Input bordered={false} className="rounded-none focus:bg-white" value={row.projectNo} onChange={(e) => updateFundRow(row.id, "projectNo", e.target.value)} />
+                                  <Input bordered={false} className="rounded-none focus:bg-white border-l border-[#e5e7eb]" value={row.projectName} onChange={(e) => updateFundRow(row.id, "projectName", e.target.value)} />
+                                  <Input bordered={false} className="rounded-none focus:bg-white border-l border-[#e5e7eb]" value={row.unit} onChange={(e) => updateFundRow(row.id, "unit", e.target.value)} />
+                                  <Input bordered={false} className="rounded-none focus:bg-white border-l border-[#e5e7eb]" value={row.category} onChange={(e) => updateFundRow(row.id, "category", e.target.value)} />
+                                  <Input bordered={false} className="rounded-none focus:bg-white border-l border-[#e5e7eb]" value={row.enName} onChange={(e) => updateFundRow(row.id, "enName", e.target.value)} />
+                                  <Input bordered={false} className="rounded-none focus:bg-white border-l border-[#e5e7eb]" value={row.fundName} onChange={(e) => updateFundRow(row.id, "fundName", e.target.value)} />
+                                  <Input bordered={false} className="rounded-none focus:bg-white border-l border-[#e5e7eb]" value={row.remark} onChange={(e) => updateFundRow(row.id, "remark", e.target.value)} />
+                                  <div className="flex items-center justify-center border-l border-[#e5e7eb]">
+                                    <Button danger type="text" size="small" onClick={() => removeFundRow(row.id)}>删除</Button>
+                                  </div>
+                                </div>
+                              ))}
+                              {fundRows.length === 0 && (
+                                <div className="text-center py-6 text-gray-400 border-t border-[#e5e7eb]">暂无基金数据，请添加</div>
+                              )}
+                            </div>
+                          </div>
+                          <Button onClick={addFundRow} type="dashed" className="w-full">
+                            + 新增一条基金信息
+                          </Button>
+                        </>
+                      )}
+                   </div>
 
-                  <Card
-                    title="版权协议"
-                    extra={
-                      <Link href="/copyright" target="_blank" className="text-[#8B1538] hover:underline">
-                        查看完整协议
+                   <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <Text strong className="text-[15px]">作者署名与排序</Text>
+                      </div>
+                      <div className="mb-4 overflow-x-auto rounded-sm border border-[#e5e7eb]">
+                        <div className="min-w-[1100px]">
+                          <div className="grid grid-cols-[90px_100px_120px_170px_140px_210px_150px_180px_70px] bg-gray-50 text-center text-sm font-medium text-gray-700">
+                            <div className="border-r border-[#e5e7eb] py-3">署名顺序</div>
+                            <div className="border-r border-[#e5e7eb] py-3">通讯作者</div>
+                            <div className="border-r border-[#e5e7eb] py-3">姓名</div>
+                            <div className="border-r border-[#e5e7eb] py-3">工作单位</div>
+                            <div className="border-r border-[#e5e7eb] py-3">部门/院系</div>
+                            <div className="border-r border-[#e5e7eb] py-3">地址及邮编</div>
+                            <div className="border-r border-[#e5e7eb] py-3">联系电话</div>
+                            <div className="border-r border-[#e5e7eb] py-3">E-mail</div>
+                            <div className="py-3">操作</div>
+                          </div>
+                          {authorRows.map((row, idx) => (
+                            <div
+                              key={row.id}
+                              className="grid grid-cols-[90px_100px_120px_170px_140px_210px_150px_180px_70px] border-t border-[#e5e7eb] group hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="border-r border-[#e5e7eb] px-2 py-3 text-center text-sm text-gray-500">第 {idx + 1} 作者</div>
+                              <div className="flex items-center justify-center border-r border-[#e5e7eb]">
+                                <Checkbox
+                                  checked={row.isCorresponding}
+                                  onChange={(e) => updateAuthorRow(row.id, "isCorresponding", e.target.checked)}
+                                />
+                              </div>
+                              <Input bordered={false} className="rounded-none focus:bg-white" value={row.name} onChange={(e) => updateAuthorRow(row.id, "name", e.target.value)} />
+                              <Input bordered={false} className="rounded-none focus:bg-white border-l border-[#e5e7eb]" value={row.institution} onChange={(e) => updateAuthorRow(row.id, "institution", e.target.value)} />
+                              <Input bordered={false} className="rounded-none focus:bg-white border-l border-[#e5e7eb]" value={row.department} onChange={(e) => updateAuthorRow(row.id, "department", e.target.value)} />
+                              <Input bordered={false} className="rounded-none focus:bg-white border-l border-[#e5e7eb]" value={row.address} onChange={(e) => updateAuthorRow(row.id, "address", e.target.value)} />
+                              <Input bordered={false} className="rounded-none focus:bg-white border-l border-[#e5e7eb]" value={row.phone} onChange={(e) => updateAuthorRow(row.id, "phone", e.target.value)} />
+                              <Input bordered={false} className="rounded-none focus:bg-white border-l border-[#e5e7eb]" value={row.email} onChange={(e) => updateAuthorRow(row.id, "email", e.target.value)} />
+                              <div className="flex items-center justify-center border-l border-[#e5e7eb]">
+                                <Button danger type="text" size="small" onClick={() => removeAuthorRow(row.id)}>删除</Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <Button onClick={addAuthorRow} type="dashed" className="w-full">
+                        + 添加合作作者
+                      </Button>
+                   </div>
+                </section>
+
+                <Divider className="!m-0 border-[#e5e7eb]" />
+
+                {/* 版权协议与提示 */}
+                <section>
+                   <div className="flex items-center justify-between mb-6">
+                      <Title level={3} className="!mb-0 !font-normal !text-gray-900">版权转让协议</Title>
+                      <Link href="/copyright" target="_blank" className="text-[#8B1538] hover:underline text-sm font-medium">
+                        查看完整协议 →
                       </Link>
-                    }
-                  >
-                    <Paragraph className="!mb-4 !text-[14px] !text-[#667085]">
-                      {COPYRIGHT_AGREEMENT_TITLE}
-                    </Paragraph>
-                    <div className="max-h-52 overflow-y-auto rounded-lg border border-[#e5e7eb] bg-[#fafbfc] px-4 py-3 text-sm leading-7 text-[#3a3a3c]">
-                      {COPYRIGHT_AGREEMENT_PARAGRAPHS.map((p, i) => (
-                        <p key={i} className={i > 0 ? "mt-3" : ""}>
-                          {p}
-                        </p>
-                      ))}
-                    </div>
+                   </div>
+                   
+                  <Paragraph className="!mb-4 !text-[15px] !text-[#667085]">
+                    {COPYRIGHT_AGREEMENT_TITLE}
+                  </Paragraph>
+                  <div className="max-h-60 overflow-y-auto rounded-sm border border-[#e5e7eb] bg-gray-50 px-6 py-5 text-[14px] leading-7 text-[#4b5563]">
+                    {COPYRIGHT_AGREEMENT_PARAGRAPHS.map((p, i) => (
+                      <p key={i} className={i > 0 ? "mt-4" : ""}>
+                        {p}
+                      </p>
+                    ))}
+                  </div>
 
-                    <Form.Item
-                      name="agreeCopyright"
-                      valuePropName="checked"
-                      className="!mb-0 !mt-4"
-                      rules={[
-                        {
-                          required: true,
-                          message: "请阅读并勾选同意《版权转让协议》",
-                          transform: (v) => v,
-                          validator: (_, value) =>
-                            value
-                              ? Promise.resolve()
-                              : Promise.reject(new Error("请阅读并勾选同意《版权转让协议》")),
-                        },
-                      ]}
-                    >
-                      <Checkbox>{COPYRIGHT_AGREEMENT_CHECKBOX_LABEL}</Checkbox>
-                    </Form.Item>
-                  </Card>
-
-                  <Card title="基金信息">
-                    <div className="mb-5 overflow-x-auto rounded-lg border border-[#e5e7eb]">
-                      <div className="min-w-[980px]">
-                        <div className="grid grid-cols-[70px_120px_140px_150px_120px_150px_150px_110px_70px] bg-[#f7f7fa] text-center text-sm text-[#3a3a3c]">
-                          <div className="border-r border-[#e5e5e7] py-2">序号</div>
-                          <div className="border-r border-[#e5e5e7] py-2">项目号</div>
-                          <div className="border-r border-[#e5e5e7] py-2">项目名称</div>
-                          <div className="border-r border-[#e5e5e7] py-2">立项单位/部门</div>
-                          <div className="border-r border-[#e5e5e7] py-2">项目类别</div>
-                          <div className="border-r border-[#e5e5e7] py-2">项目英文名称</div>
-                          <div className="border-r border-[#e5e5e7] py-2">基金名称</div>
-                          <div className="border-r border-[#e5e5e7] py-2">项目备注</div>
-                          <div className="py-2">删除</div>
-                        </div>
-                        {fundRows.map((row, idx) => (
-                          <div
-                            key={row.id}
-                            className="grid grid-cols-[70px_120px_140px_150px_120px_150px_150px_110px_70px] border-t border-[#e5e5e7]"
-                          >
-                            <div className="border-r border-[#e5e5e7] px-2 py-2 text-center text-sm">{idx + 1}</div>
-                            <Input bordered={false} value={row.projectNo} onChange={(e) => updateFundRow(row.id, "projectNo", e.target.value)} />
-                            <Input bordered={false} value={row.projectName} onChange={(e) => updateFundRow(row.id, "projectName", e.target.value)} />
-                            <Input bordered={false} value={row.unit} onChange={(e) => updateFundRow(row.id, "unit", e.target.value)} />
-                            <Input bordered={false} value={row.category} onChange={(e) => updateFundRow(row.id, "category", e.target.value)} />
-                            <Input bordered={false} value={row.enName} onChange={(e) => updateFundRow(row.id, "enName", e.target.value)} />
-                            <Input bordered={false} value={row.fundName} onChange={(e) => updateFundRow(row.id, "fundName", e.target.value)} />
-                            <Input bordered={false} value={row.remark} onChange={(e) => updateFundRow(row.id, "remark", e.target.value)} />
-                            <div className="flex items-center justify-center border-l border-[#e5e5e7]">
-                              <Button danger type="text" onClick={() => removeFundRow(row.id)}>删</Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <Space wrap>
-                      <Button onClick={addFundRow}>添加基金</Button>
-                      <Checkbox checked={noFund} onChange={(e) => setNoFund(e.target.checked)}>无基金</Checkbox>
-                    </Space>
-                  </Card>
-
-                  <Card title="作者信息">
-                    <div className="mb-5 overflow-x-auto rounded-lg border border-[#e5e5e7]">
-                      <div className="min-w-[1100px]">
-                        <div className="grid grid-cols-[90px_100px_120px_170px_140px_210px_150px_180px_70px] bg-[#f7f7fa] text-center text-sm text-[#3a3a3c]">
-                          <div className="border-r border-[#e5e5e7] py-2">序号</div>
-                          <div className="border-r border-[#e5e5e7] py-2">通讯作者</div>
-                          <div className="border-r border-[#e5e5e7] py-2">姓名</div>
-                          <div className="border-r border-[#e5e5e7] py-2">工作单位</div>
-                          <div className="border-r border-[#e5e5e7] py-2">部门/院系</div>
-                          <div className="border-r border-[#e5e5e7] py-2">地址及邮编</div>
-                          <div className="border-r border-[#e5e5e7] py-2">电话或手机</div>
-                          <div className="border-r border-[#e5e5e7] py-2">E-mail</div>
-                          <div className="py-2">删除</div>
-                        </div>
-                        {authorRows.map((row, idx) => (
-                          <div
-                            key={row.id}
-                            className="grid grid-cols-[90px_100px_120px_170px_140px_210px_150px_180px_70px] border-t border-[#e5e5e7]"
-                          >
-                            <div className="border-r border-[#e5e5e7] px-2 py-2 text-center text-sm">{idx + 1}(作者)</div>
-                            <div className="flex items-center justify-center border-r border-[#e5e5e7]">
-                              <Checkbox
-                                checked={row.isCorresponding}
-                                onChange={(e) => updateAuthorRow(row.id, "isCorresponding", e.target.checked)}
-                              />
-                            </div>
-                            <Input bordered={false} value={row.name} onChange={(e) => updateAuthorRow(row.id, "name", e.target.value)} />
-                            <Input bordered={false} value={row.institution} onChange={(e) => updateAuthorRow(row.id, "institution", e.target.value)} />
-                            <Input bordered={false} value={row.department} onChange={(e) => updateAuthorRow(row.id, "department", e.target.value)} />
-                            <Input bordered={false} value={row.address} onChange={(e) => updateAuthorRow(row.id, "address", e.target.value)} />
-                            <Input bordered={false} value={row.phone} onChange={(e) => updateAuthorRow(row.id, "phone", e.target.value)} />
-                            <Input bordered={false} value={row.email} onChange={(e) => updateAuthorRow(row.id, "email", e.target.value)} />
-                            <div className="flex items-center justify-center border-l border-[#e5e5e7]">
-                              <Button danger type="text" onClick={() => removeAuthorRow(row.id)}>删</Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <Button onClick={addAuthorRow}>添加作者</Button>
-                  </Card>
-
-                  {error && <Alert message={error} type="error" showIcon />}
-
-                  <Card>
-                    <div className="flex flex-wrap items-center justify-end gap-3">
-                      <Button size="large" onClick={() => router.back()}>
-                        返回
-                      </Button>
-                      <Button
-                        type="primary"
-                        htmlType="submit"
-                        loading={loading}
-                        size="large"
-                      >
-                        {loading ? "提交中…" : "提交稿件"}
-                      </Button>
-                    </div>
-                  </Card>
-                </Space>
-              </Form>
-            </Col>
-
-            <Col xs={24} xl={7}>
-              <Space direction="vertical" size={24} className="flex w-full xl:sticky xl:top-6">
-                <Card title="投稿人信息">
-                  <Descriptions column={1} size="small" bordered>
-                    <Descriptions.Item label="投稿人">{user.real_name || "未填写"}</Descriptions.Item>
-                    <Descriptions.Item label="邮箱">{user.email}</Descriptions.Item>
-                    <Descriptions.Item label="单位">{user.institution || "未填写"}</Descriptions.Item>
-                  </Descriptions>
-                </Card>
-
-                <Card title="提交前检查">
-                  <List
-                    size="small"
-                    dataSource={[
-                      "标题、摘要、关键词已填写",
-                      "稿件文件格式为 DOC/DOCX/PDF",
-                      `单文件大小不超过 ${MAX_FILE_SIZE_MB}MB`,
-                      "已勾选版权协议",
+                  <Form.Item
+                    name="agreeCopyright"
+                    valuePropName="checked"
+                    className="!mb-0 !mt-6"
+                    rules={[
+                      {
+                        required: true,
+                        message: "请阅读并勾选同意《版权转让协议》",
+                        transform: (v) => v,
+                        validator: (_, value) =>
+                          value
+                            ? Promise.resolve()
+                            : Promise.reject(new Error("请阅读并勾选同意《版权转让协议》")),
+                      },
                     ]}
-                    renderItem={(item) => <List.Item>{item}</List.Item>}
-                  />
-                </Card>
+                  >
+                    <Checkbox className="text-[15px] text-gray-800 font-medium">{COPYRIGHT_AGREEMENT_CHECKBOX_LABEL}</Checkbox>
+                  </Form.Item>
+                </section>
 
-                <Card title="提交流程说明">
-                  <Space direction="vertical" size={12}>
-                    <Text className="text-[#667085]">
-                      提交成功后，可在作者中心查看稿件状态、接收退修意见并上传修订稿。
-                    </Text>
-                    <Link href="/author">
-                      <Button block>前往作者中心</Button>
-                    </Link>
-                  </Space>
-                </Card>
+                {error && <Alert message={error} type="error" showIcon />}
+
+                {/* 底部操作区 */}
+                <div className="flex flex-wrap items-center justify-end gap-4 border-t border-[#e5e7eb] pt-8">
+                  <Button size="large" onClick={() => router.back()} className="rounded-sm px-8">
+                    返回上一页
+                  </Button>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={loading}
+                    size="large"
+                    className="bg-[#8B1538] hover:!bg-[#A51D45] rounded-sm px-12 border-none h-10 shadow-md"
+                  >
+                    {loading ? "提交中…" : "确认无误，提交稿件"}
+                  </Button>
+                </div>
+
               </Space>
-            </Col>
-          </Row>
-        </Space>
+            </Form>
+          </Col>
+
+          {/* 右侧信息面板 */}
+          <Col xs={24} xl={8}>
+            <Space direction="vertical" size={32} className="flex w-full xl:sticky xl:top-8 mt-12 xl:mt-0">
+              
+              <div className="bg-gray-50 p-6 rounded-sm border border-[#e5e7eb]">
+                <Title level={5} className="!font-medium !text-gray-900 !mt-0 !mb-4 flex items-center gap-2">
+                   操作人信息
+                </Title>
+                <Descriptions column={1} size="small" className="mb-0 text-sm">
+                  <Descriptions.Item label={<span className="text-gray-500">账号姓名</span>}>{user.real_name || "未填写"}</Descriptions.Item>
+                  <Descriptions.Item label={<span className="text-gray-500">注册邮箱</span>}>{user.email}</Descriptions.Item>
+                  <Descriptions.Item label={<span className="text-gray-500">默认单位</span>}>{user.institution || "未填写"}</Descriptions.Item>
+                </Descriptions>
+              </div>
+
+              <div>
+                <Title level={5} className="!font-medium !text-gray-900 !mt-0 !mb-4 border-b border-[#e5e7eb] pb-2">
+                  提交前自检清单
+                </Title>
+                <List
+                  size="small"
+                  className="border-none"
+                  dataSource={[
+                    "文档标题、摘要、关键词已正确填写",
+                    "稿件文件格式符合 DOC/DOCX/PDF 标准",
+                    `单文件尺寸不超过系统 ${MAX_FILE_SIZE_MB}MB 限制`,
+                    "作者署名顺序及通讯作者已确认",
+                    "已阅读全文并勾选版权转让协议",
+                  ]}
+                  renderItem={(item, i) => (
+                    <List.Item className="!px-0 !border-b-0 py-1.5 flex items-start gap-2">
+                       <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-green-50 text-green-600 text-xs shrink-0 mt-0.5">✓</span>
+                       <span className="text-gray-600 text-sm leading-relaxed">{item}</span>
+                    </List.Item>
+                  )}
+                />
+              </div>
+
+              <div className="bg-red-50/50 p-6 rounded-sm border border-red-100">
+                <Title level={5} className="!font-medium !text-[#8B1538] !mt-0 !mb-3">
+                  下一步提交流程
+                </Title>
+                <Text className="text-gray-600 text-sm leading-relaxed block mb-5">
+                  成功提交后，系统将自动对稿件进行机器初步解析，之后可随时在作者中心追踪稿件录用、外审情况及专家退修意见。
+                </Text>
+                <Link href="/author">
+                  <Button block className="rounded-sm border-red-200 text-[#8B1538] hover:!border-[#8B1538] hover:!text-[#8B1538]">
+                    前往我的作者中心
+                  </Button>
+                </Link>
+              </div>
+
+            </Space>
+          </Col>
+        </Row>
       </main>
     </div>
   );

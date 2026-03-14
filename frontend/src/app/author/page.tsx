@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   Button,
-  Card,
   Col,
   Descriptions,
   Form,
@@ -20,6 +19,7 @@ import {
   Tag,
   Typography,
   message,
+  Divider,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import HeaderBar from "@/components/HeaderBar";
@@ -246,102 +246,101 @@ export default function AuthorCenterPage() {
   };
 
   return (
-    <div className="bg-[#f4f6f8]">
+    <div className="bg-white text-[#1d1d1f] min-h-screen flex flex-col">
       <HeaderBar />
       <main
         id="main-content"
-        className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8"
+        className="flex-1 mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8"
         aria-label="作者中心"
       >
-        <Space direction="vertical" size={24} className="flex w-full">
-          <Card styles={{ body: { padding: 28 } }}>
-            <Row gutter={[24, 24]} align="middle">
-              <Col xs={24} lg={16}>
-                <Text className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8B1538]">
-                  Author Center
-                </Text>
-                <Title level={2} className="!mb-2 !mt-3 !text-[#1f2937]">
-                  作者中心
-                </Title>
-                <Paragraph className="!mb-0 !max-w-3xl !text-[15px] !leading-8 !text-[#667085]">
-                  在这里统一维护作者资料、查看稿件状态、接收退修意见并继续上传修订稿。页面已经开始迁到新的 Ant Design 基座上，后续其他工作台也会沿这套结构推进。
-                </Paragraph>
-              </Col>
-              <Col xs={24} lg={8}>
-                <Space wrap>
-                  <Link href="/submit">
-                    <Button type="primary" size="large">
-                      发起新投稿
-                    </Button>
-                  </Link>
-                  <Link href="/guide">
-                    <Button size="large">查看投稿须知</Button>
-                  </Link>
-                </Space>
-              </Col>
-            </Row>
-          </Card>
-
-          <Row gutter={[16, 16]}>
-            <Col xs={24} md={8}>
-              <Card size="small">
-                <Statistic title="稿件总数" value={total} />
-              </Card>
+        <section className="mb-10">
+          <Row gutter={[24, 24]} align="middle">
+            <Col xs={24} lg={16}>
+              <Text className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8B1538]">
+                Author Center
+              </Text>
+              <Title level={1} className="!mb-3 !mt-3 !font-medium !text-[#1f2937]">
+                作者中心
+              </Title>
+              <Paragraph className="!mb-0 !max-w-3xl !text-[16px] !leading-relaxed !text-[#6b7280]">
+                在这里统一维护作者资料、查看稿件状态、接收退修意见并继续上传修订稿。页面已经开始迁到新的 Ant Design 基座上，后续其他工作台也会沿这套结构推进。
+              </Paragraph>
             </Col>
-            <Col xs={24} md={8}>
-              <Card size="small">
-                <Statistic title="当前页处理中" value={currentPageReviewing} />
-              </Card>
-            </Col>
-            <Col xs={24} md={8}>
-              <Card size="small">
-                <Statistic title="当前页待退修" value={currentPageRevision} />
-              </Card>
+            <Col xs={24} lg={8} className="text-left lg:text-right">
+              <Space wrap>
+                <Link href="/submit">
+                  <Button type="primary" size="large" className="bg-[#8B1538] hover:!bg-[#A51D45] border-none rounded-sm px-6">
+                    发起新投稿
+                  </Button>
+                </Link>
+                <Link href="/guide">
+                  <Button size="large" className="rounded-sm">
+                    查看投稿须知
+                  </Button>
+                </Link>
+              </Space>
             </Col>
           </Row>
+        </section>
 
-          <Row gutter={[24, 24]} align="stretch">
-            <Col xs={24} xl={8}>
-              <Card title="账户概览">
-                <Descriptions column={1} size="small" bordered>
-                  <Descriptions.Item label="登录邮箱">{user.email}</Descriptions.Item>
-                  <Descriptions.Item label="姓名">{user.real_name || "未填写"}</Descriptions.Item>
-                  <Descriptions.Item label="单位">{user.institution || "未填写"}</Descriptions.Item>
-                  <Descriptions.Item label="身份">{user.role}</Descriptions.Item>
-                </Descriptions>
-                <Space direction="vertical" size={12} className="mt-6 flex w-full">
-                  <Link href="/submit">
-                    <Button block type="primary">
-                      进入投稿入口
-                    </Button>
-                  </Link>
-                  <Link href="/copyright">
-                    <Button block>查看版权协议</Button>
-                  </Link>
-                </Space>
-              </Card>
+        <Divider className="!border-[#e5e7eb] !mb-10" />
+
+        <section className="mb-12">
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={8}>
+              <div className="bg-gray-50 border border-[#e5e7eb] p-6 rounded-sm flex items-center justify-between">
+                 <Text className="text-gray-500 font-medium">我的稿件总数</Text>
+                 <Text className="text-3xl font-serif-sc text-gray-900">{total}</Text>
+              </div>
             </Col>
+            <Col xs={24} md={8}>
+               <div className="bg-blue-50/50 border border-blue-100 p-6 rounded-sm flex items-center justify-between">
+                 <Text className="text-blue-700 font-medium">当前处理中</Text>
+                 <Text className="text-3xl font-serif-sc text-blue-800">{currentPageReviewing}</Text>
+              </div>
+            </Col>
+            <Col xs={24} md={8}>
+               <div className="bg-red-50/50 border border-red-100 p-6 rounded-sm flex items-center justify-between">
+                 <Text className="text-[#8B1538] font-medium">待退修回传</Text>
+                 <Text className="text-3xl font-serif-sc text-[#8B1538]">{currentPageRevision}</Text>
+              </div>
+            </Col>
+          </Row>
+        </section>
 
-            <Col xs={24} xl={16}>
-              <Card
-                title="个人信息"
-                extra={<Text type="secondary">带 * 字段为必填项</Text>}
-              >
+        <Divider className="!border-[#e5e7eb] !mb-10" />
+
+        <Row gutter={[48, 48]} align="top">
+          {/* 左侧主要区域 */}
+          <Col xs={24} xl={16}>
+             <section className="mb-12">
+                <div className="flex items-center justify-between mb-6">
+                  <Title level={3} className="!mb-0 !font-normal !text-gray-900">
+                    个人信息资料
+                  </Title>
+                  <Text type="secondary" className="text-sm">带 * 字段为必填项</Text>
+                </div>
+                
                 <Form
                   form={profileForm}
                   layout="vertical"
                   onFinish={handleSaveProfile}
+                  className="bg-white border border-[#e5e7eb] p-8 rounded-sm shadow-sm"
                 >
-                  <Row gutter={16}>
+                  <Row gutter={24}>
                     <Col xs={24}>
                       <Form.Item label="登录邮箱">
-                        <Input value={user.email} disabled />
+                        <Input size="large" value={user.email} disabled className="bg-gray-50" />
                       </Form.Item>
                     </Col>
+                  </Row>
+                  
+                  <Divider className="!my-6 border-[#f0f0f0]" />
 
+                  <Row gutter={24}>
                     <Col xs={24}>
-                      <Title level={5} className="!mb-4 !mt-0">
-                        基本信息
+                      <Title level={5} className="!mb-6 !mt-0 !text-gray-800">
+                        第一部分：基本信息
                       </Title>
                     </Col>
                     <Col xs={24} md={12}>
@@ -350,43 +349,47 @@ export default function AuthorCenterPage() {
                         label="姓名"
                         rules={[{ required: true, message: "请输入姓名" }]}
                       >
-                        <Input placeholder="请输入姓名" maxLength={100} />
+                        <Input size="large" placeholder="请输入真实姓名" maxLength={100} className="rounded-sm" />
                       </Form.Item>
                     </Col>
                     <Col xs={24} md={12}>
                       <Form.Item name="salutation" label="称呼">
-                        <Select placeholder="请选择" allowClear options={SALUTATION_OPTIONS} />
+                        <Select size="large" placeholder="请选择" allowClear options={SALUTATION_OPTIONS} className="rounded-sm" />
                       </Form.Item>
                     </Col>
                     <Col xs={24} md={8}>
-                      <Form.Item name="name_en_first" label="英文名 First Name">
-                        <Input placeholder="First Name" maxLength={50} />
+                        <Form.Item name="name_en_last" label="姓 - Last Name (如: Zhang)">
+                        <Input size="large" placeholder="Last Name" maxLength={50} className="rounded-sm" />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={8}>
+                        <Form.Item name="name_en_first" label="名 - First Name (如: San)">
+                        <Input size="large" placeholder="First Name" maxLength={50} className="rounded-sm" />
                       </Form.Item>
                     </Col>
                     <Col xs={24} md={8}>
                       <Form.Item name="name_en_middle" label="Middle Name">
-                        <Input placeholder="Middle Name" maxLength={50} />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} md={8}>
-                      <Form.Item name="name_en_last" label="Last Name">
-                        <Input placeholder="Last Name" maxLength={50} />
+                        <Input size="large" placeholder="Middle Name" maxLength={50} className="rounded-sm" />
                       </Form.Item>
                     </Col>
                     <Col xs={24} md={12}>
                       <Form.Item name="ethnicity" label="民族">
-                        <Select placeholder="请选择" allowClear options={ETHNICITY_OPTIONS} />
+                        <Select size="large" placeholder="请选择" allowClear options={ETHNICITY_OPTIONS} className="rounded-sm" />
                       </Form.Item>
                     </Col>
+                  </Row>
+                  
+                  <Divider className="!my-6 border-[#f0f0f0]" />
 
+                  <Row gutter={24}>
                     <Col xs={24}>
-                      <Title level={5} className="!mb-4 !mt-2">
-                        通信信息
+                      <Title level={5} className="!mb-6 !mt-0 !text-gray-800">
+                        第二部分：通信信息
                       </Title>
                     </Col>
                     <Col xs={24} md={12}>
-                      <Form.Item name="phone" label="电话">
-                        <Input placeholder="请输入电话" maxLength={30} />
+                      <Form.Item name="phone" label="联系电话">
+                        <Input size="large" placeholder="请输入手机或固话" maxLength={30} className="rounded-sm" />
                       </Form.Item>
                     </Col>
                     <Col xs={24} md={12}>
@@ -395,83 +398,120 @@ export default function AuthorCenterPage() {
                         label="邮政编码"
                         rules={[{ required: true, message: "请输入邮政编码" }]}
                       >
-                        <Input placeholder="请输入邮政编码" maxLength={20} />
+                        <Input size="large" placeholder="请输入邮编" maxLength={20} className="rounded-sm" />
                       </Form.Item>
                     </Col>
                     <Col xs={24}>
                       <Form.Item
                         name="postal_address"
-                        label="邮寄地址"
+                        label="详细邮寄地址"
                         rules={[{ required: true, message: "请输入邮寄地址" }]}
                       >
-                        <Input placeholder="请输入邮寄地址" maxLength={300} />
+                        <Input size="large" placeholder="请输入详细地址，用于接收样刊等" maxLength={300} className="rounded-sm" />
                       </Form.Item>
                     </Col>
+                  </Row>
 
+                  <Divider className="!my-6 border-[#f0f0f0]" />
+
+                  <Row gutter={24}>
                     <Col xs={24}>
-                      <Title level={5} className="!mb-4 !mt-2">
-                        研究与单位
+                      <Title level={5} className="!mb-6 !mt-0 !text-gray-800">
+                        第三部分：研究与学术单位
                       </Title>
                     </Col>
-                    <Col xs={24}>
-                      <Form.Item name="research_field" label="研究领域">
-                        <Input placeholder="请填写您的研究领域" maxLength={200} />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} md={12}>
-                      <Form.Item
-                        name="title_zh"
-                        label="职务"
-                        rules={[{ required: true, message: "请选择职务" }]}
-                      >
-                        <Select placeholder="请选择职务" options={TITLE_ZH_OPTIONS} />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} md={12}>
-                      <Form.Item
-                        name="title_en"
-                        label="职称"
-                        rules={[{ required: true, message: "请选择职称" }]}
-                      >
-                        <Select placeholder="请选择职称" options={TITLE_EN_OPTIONS} />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24}>
+                     <Col xs={24}>
                       <Form.Item
                         name="institution"
                         label="单位名称"
                         rules={[{ required: true, message: "请输入单位名称" }]}
                       >
-                        <Input placeholder="请输入单位名称" maxLength={200} />
+                        <Input size="large" placeholder="请输入完整的工作单位名称" maxLength={200} className="rounded-sm" />
                       </Form.Item>
                     </Col>
-
                     <Col xs={24}>
-                      <Space>
-                        <Button type="primary" htmlType="submit" loading={savingProfile}>
-                          保存修改
-                        </Button>
-                      </Space>
+                      <Form.Item name="research_field" label="重点研究领域">
+                        <Input.TextArea rows={3} placeholder="请简要填写您的研究专长与主要领域" maxLength={200} className="rounded-sm" />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={12}>
+                      <Form.Item
+                        name="title_zh"
+                        label="行政职务"
+                        rules={[{ required: true, message: "请选择职务" }]}
+                      >
+                        <Select size="large" placeholder="请选择职务" options={TITLE_ZH_OPTIONS} className="rounded-sm" />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={12}>
+                      <Form.Item
+                        name="title_en"
+                        label="学术职称"
+                        rules={[{ required: true, message: "请选择职称" }]}
+                      >
+                        <Select size="large" placeholder="请选择职称" options={TITLE_EN_OPTIONS} className="rounded-sm" />
+                      </Form.Item>
                     </Col>
                   </Row>
+                  
+                  <div className="mt-6 flex justify-end border-t border-[#f0f0f0] pt-6">
+                    <Button type="primary" size="large" htmlType="submit" loading={savingProfile} className="bg-[#8B1538] hover:!bg-[#A51D45] border-none px-12 rounded-sm shadow-sm">
+                      保存所有修改
+                    </Button>
+                  </div>
                 </Form>
-              </Card>
-            </Col>
-          </Row>
+             </section>
+          </Col>
 
-          <Card
-            title="我的稿件"
-            extra={
+          {/* 右侧边栏区 */}
+          <Col xs={24} xl={8}>
+            <section className="xl:sticky xl:top-6">
+              <div className="bg-gray-50 border border-[#e5e7eb] p-6 rounded-sm mb-8">
+                 <Title level={5} className="!font-medium !text-gray-900 !mt-0 !mb-5 flex items-center justify-between">
+                    账户总览摘要
+                    <span className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">作者级账户</span>
+                 </Title>
+                 <Descriptions column={1} size="small" className="mb-0 text-sm">
+                  <Descriptions.Item label={<span className="text-gray-500">主邮箱</span>}>{user.email}</Descriptions.Item>
+                  <Descriptions.Item label={<span className="text-gray-500">识别姓名</span>}>{user.real_name || "待完善"}</Descriptions.Item>
+                  <Descriptions.Item label={<span className="text-gray-500">隶属机构</span>}>{user.institution || "待完善"}</Descriptions.Item>
+                  <Descriptions.Item label={<span className="text-gray-500">系统角色</span>}>{user.role}</Descriptions.Item>
+                </Descriptions>
+                
+                <Space direction="vertical" size={12} className="mt-8 flex w-full">
+                  <Link href="/submit">
+                    <Button block size="large" className="rounded-sm text-[#8B1538] border-[#8B1538] hover:!text-[#A51D45] hover:!border-[#A51D45]">
+                      进入投稿入口
+                    </Button>
+                  </Link>
+                  <Link href="/copyright">
+                    <Button block size="large" type="text" className="rounded-sm text-gray-500 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 border-none mt-2">
+                       查阅版权协议副本
+                    </Button>
+                  </Link>
+                </Space>
+              </div>
+            </section>
+          </Col>
+        </Row>
+        
+        <Divider className="!border-[#e5e7eb] !my-4" />
+
+        <section id="my-manuscripts-list" className="mt-12">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+              <Title level={3} className="!mb-0 !font-normal !text-gray-900">
+                我投递的稿件
+              </Title>
               <Space align="center" wrap>
-                <Text type="secondary">状态筛选</Text>
+                <Text type="secondary" className="text-sm">状态筛选</Text>
                 <Select
                   value={statusFilter || undefined}
                   onChange={(value) => {
                     setStatusFilter(value || "");
                     setPage(1);
                   }}
-                  placeholder="全部"
-                  style={{ width: 140 }}
+                  placeholder="全部状态筛选"
+                  style={{ width: 160 }}
                   allowClear
                   options={Object.entries(STATUS_MAP).map(([key, value]) => ({
                     label: value,
@@ -479,54 +519,56 @@ export default function AuthorCenterPage() {
                   }))}
                 />
               </Space>
-            }
-          >
+            </div>
+            
             <Space direction="vertical" size={16} className="flex w-full">
               {keywordFilter ? (
-                <Alert type="info" showIcon message={`当前搜索：${keywordFilter}`} />
+                <Alert type="info" showIcon message={`当前搜索：${keywordFilter}`} className="rounded-sm border-blue-200 bg-blue-50" />
               ) : null}
-              {successMessage ? <Alert message={successMessage} type="success" showIcon /> : null}
+              {successMessage ? <Alert message={successMessage} type="success" showIcon className="rounded-sm" /> : null}
               {loadError ? (
                 <Alert
                   message={loadError}
                   type="warning"
                   showIcon
+                  className="rounded-sm"
                   action={
                     <Button size="small" onClick={() => window.location.reload()}>
-                      刷新
+                      刷新重试
                     </Button>
                   }
                 />
               ) : null}
 
-              <Table<ManuscriptListItem>
-                rowKey="id"
-                columns={columns}
-                dataSource={list}
-                loading={loading}
-                scroll={{ x: "max-content" }}
-                pagination={{
-                  current: page,
-                  pageSize,
-                  total,
-                  showSizeChanger: false,
-                  showTotal: (value) => `共 ${value} 条`,
-                  onChange: setPage,
-                }}
-                locale={{
-                  emptyText: (
-                    <span>
-                      暂无稿件，
-                      <Link href="/submit" className="ml-1 text-[#8B1538]">
-                        去投稿
-                      </Link>
-                    </span>
-                  ),
-                }}
-              />
+              <div className="border border-[#e5e7eb] rounded-sm overflow-hidden bg-white shadow-sm">
+                <Table<ManuscriptListItem>
+                  rowKey="id"
+                  columns={columns}
+                  dataSource={list}
+                  loading={loading}
+                  scroll={{ x: "max-content" }}
+                  pagination={{
+                    current: page,
+                    pageSize,
+                    total,
+                    showSizeChanger: false,
+                    showTotal: (value) => `共找到 ${value} 条记录`,
+                    onChange: setPage,
+                  }}
+                  locale={{
+                    emptyText: (
+                      <div className="py-12">
+                        <span className="text-gray-400">暂无稿件记录，</span>
+                        <Link href="/submit" className="text-[#8B1538] hover:underline font-medium">
+                          立刻去投稿
+                        </Link>
+                      </div>
+                    ),
+                  }}
+                />
+              </div>
             </Space>
-          </Card>
-        </Space>
+        </section>
       </main>
     </div>
   );
