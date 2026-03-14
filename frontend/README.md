@@ -11,6 +11,30 @@ npm run dev
 
 浏览器打开 <http://localhost:3000>。开发时通过 `next.config.mjs` 的 rewrites 将 `/api/v1/*` 代理到后端 `http://localhost:8000`。
 
+## 生产更新（已部署旧版本）
+
+生产实例参考：`aliyun`。
+
+```bash
+cd /opt/pku_law_review_platform || cd /srv/pku_law_review_platform
+git fetch --all
+git checkout main
+git pull --rebase origin main
+
+cd frontend
+npm ci
+npm run build
+
+sudo systemctl restart law-review-web
+sudo systemctl status law-review-web --no-pager
+
+# 联调检查
+curl -I http://127.0.0.1:3000
+curl -I https://aliyun
+```
+
+如使用 Cloudflare 且更新后样式或静态资源未刷新，可在 Cloudflare 执行一次 Purge Cache。
+
 ## 当前实现
 
 - 已移除 Ant Design，全部改用 **Tailwind CSS** 样式，解决 `Module not found: 'antd'`。

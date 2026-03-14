@@ -2,6 +2,10 @@
 
 面向法学期刊编辑部的 **投稿管理 + AI 辅助初审** 平台。作者在线投稿 → 系统解析与 AI 初审报告 → 编辑退修/录用/退稿，全流程闭环。
 
+生产环境：aliyun
+
+仓库地址：<https://github.com/SmallsmallQ/pku_law_review_platform>
+
 ---
 
 ## 功能概览
@@ -33,7 +37,7 @@
 
 | 文档 | 说明 |
 |------|------|
-| [docs/deploy.md](docs/deploy.md) | **服务器部署指南**：环境、Nginx、systemd、HTTPS、检查清单 |
+| [docs/deploy.md](docs/deploy.md) | **服务器部署指南**：环境、Nginx、systemd、HTTPS、检查清单、旧版本升级更新流程 |
 | [docs/PRD-v0.1.md](docs/PRD-v0.1.md) | 产品需求：角色、流程、功能边界、AI 报告结构、开发顺序 |
 | [docs/database-schema.md](docs/database-schema.md) | 数据库表设计：用户、稿件与版本、解析、报告、操作、知识库 |
 | [docs/api-spec.md](docs/api-spec.md) | API 清单：认证、作者端、编辑端、管理员端、公开页 |
@@ -147,7 +151,7 @@ pku_law_review_platform/
 ## 开发与后续
 
 - **开发顺序建议**：见 [docs/PRD-v0.1.md](docs/PRD-v0.1.md) 第九章；当前业务闭环与管理后台已打通，后续可接文档解析、知识库与报告内容增强。
-- **生产部署**：详见 **[docs/deploy.md](docs/deploy.md)**（服务器环境、Nginx、systemd、HTTPS）。建议使用 PostgreSQL、独立 `SECRET_KEY`；前端 `npm run build` + `npm run start`，后端用 uvicorn 多 worker。
+- **生产部署与版本更新**：详见 **[docs/deploy.md](docs/deploy.md)**（服务器环境、Nginx、systemd、HTTPS、已部署旧版本的更新流程）。建议使用 PostgreSQL、独立 `SECRET_KEY`；前端 `npm run build` + `npm run start`，后端用 uvicorn 多 worker。
 
 ---
 

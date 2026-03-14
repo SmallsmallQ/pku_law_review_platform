@@ -4,16 +4,27 @@
 
 ---
 
-## 本站部署：review.smallsmallq.com
-
-以下配置均按 **review.smallsmallq.com** 编写，可直接复制使用。
+## 生产实例信息
 
 | 项目 | 值 |
 |------|-----|
-| 访问地址 | https://review.smallsmallq.com |
-| 后端 CORS | `["https://review.smallsmallq.com"]` |
-| Nginx `server_name` | `review.smallsmallq.com` |
-| certbot 域名 | `review.smallsmallq.com` |
+| 服务器 IP | |
+| 域名 | aliyun |
+| GitHub 仓库 | https://github.com/SmallsmallQ/pku_law_review_platform |
+| DNS 托管 | Cloudflare |
+
+---
+
+## 本站部署：aliyun
+
+以下配置均按 **aliyun** 编写，可直接复制使用。
+
+| 项目 | 值 |
+|------|-----|
+| 访问地址 | https://aliyun |
+| 后端 CORS | `["https://aliyun"]` |
+| Nginx `server_name` | `aliyun` |
+| certbot 域名 | `aliyun` |
 
 ---
 
@@ -58,7 +69,7 @@
 
 ```bash
 cd /opt   # 或你希望放置的目录
-git clone https://github.com/你的账号/pku_law_review_platform.git
+git clone https://github.com/SmallsmallQ/pku_law_review_platform.git
 cd pku_law_review_platform
 ```
 
@@ -92,16 +103,16 @@ nano .env
 
 **生产环境必须修改的项：**
 
-| 变量 | 说明 | 本站示例（review.smallsmallq.com） |
+| 变量 | 说明 | 本站示例（aliyun） |
 |------|------|-----------------------------------|
 | `SECRET_KEY` | JWT 密钥，务必改为随机长字符串 | `openssl rand -hex 32` 生成后填入 |
-| `CORS_ORIGINS` | 允许的前端来源（含协议与域名） | `["https://review.smallsmallq.com"]` |
+| `CORS_ORIGINS` | 允许的前端来源（含协议与域名） | `["https://aliyun"]` |
 | `DEBUG` | 生产设为 `false` | `false` |
 
 本站可直接在 `.env` 中写：
 
 ```env
-CORS_ORIGINS=["https://review.smallsmallq.com"]
+CORS_ORIGINS=["https://aliyun"]
 ```
 
 **可选：**
@@ -126,7 +137,7 @@ python -m scripts.init_db
 
 若 **前端与后端同机、且由 Nginx 统一入口**（推荐），则浏览器请求 `/api/v1` 会由 Nginx 转发到后端，**无需**再设 `NEXT_PUBLIC_API_URL`。
 
-若 **前端直连后端**（例如后端在 `https://api.review.smallsmallq.com`），则需在构建前设置。本站采用同机 Nginx 统一入口，一般**无需**设置。
+若 **前端直连后端**（例如后端在 `https://api.aliyun`），则需在构建前设置。本站采用同机 Nginx 统一入口，一般**无需**设置。
 
 ---
 
@@ -226,7 +237,7 @@ sudo systemctl status law-review-api law-review-web
 ```nginx
 server {
     listen 80;
-    server_name review.smallsmallq.com;
+    server_name aliyun;
 
     # 后端 API
     location /api/v1/ {
@@ -262,7 +273,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-**后端 .env 中的 `CORS_ORIGINS`** 本站应设为：`["https://review.smallsmallq.com"]`（上 HTTPS 后）；未上 HTTPS 前可先用 `["http://review.smallsmallq.com"]`。
+**后端 .env 中的 `CORS_ORIGINS`** 本站应设为：`["https://aliyun"]`（上 HTTPS 后）；未上 HTTPS 前可先用 `["http://aliyun"]`。
 
 ---
 
@@ -272,17 +283,17 @@ sudo systemctl reload nginx
 
 ```bash
 sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d review.smallsmallq.com
+sudo certbot --nginx -d aliyun
 ```
 
-按提示选择为上述 Nginx server 申请证书并自动配置 HTTPS。完成后确认后端 `.env` 中 `CORS_ORIGINS=["https://review.smallsmallq.com"]`，并执行 `sudo systemctl restart law-review-api`。
+按提示选择为上述 Nginx server 申请证书并自动配置 HTTPS。完成后确认后端 `.env` 中 `CORS_ORIGINS=["https://aliyun"]`，并执行 `sudo systemctl restart law-review-api`。
 
 ---
 
 ## 十、部署检查清单
 
 - [ ] 后端 `SECRET_KEY` 已改为随机字符串
-- [ ] 后端 `CORS_ORIGINS` 为 `["https://review.smallsmallq.com"]`（或未上 HTTPS 时 `["http://review.smallsmallq.com"]`）
+- [ ] 后端 `CORS_ORIGINS` 为 `["https://aliyun"]`（或未上 HTTPS 时 `["http://aliyun"]`）
 - [ ] 后端 `DEBUG=false`
 - [ ] 数据库已执行 `python -m scripts.init_db`
 - [ ] 存储目录存在且进程有写权限（使用 `STORAGE_LOCAL_PATH` 时）
@@ -296,8 +307,81 @@ sudo certbot --nginx -d review.smallsmallq.com
 
 ## 十一、更新与回滚
 
-- **更新代码**：`git pull` 后，重新安装依赖、执行数据库迁移（若有）、`npm run build`（前端），再重启后端与前端服务。
-- **回滚**：`git checkout <旧版本>`，按同样步骤重装依赖、重建前端、重启服务；如有数据库迁移，需按项目约定回滚迁移。
+### 11.1 已部署旧版本时的标准更新流程（systemd）
+
+```bash
+# 1) 登录服务器
+ssh aliyun
+
+# 2) 进入项目目录（按实际路径二选一）
+cd /opt/pku_law_review_platform || cd /srv/pku_law_review_platform
+
+# 3) 备份（建议）
+mkdir -p /opt/backup
+if [ -f backend/law_review.db ]; then
+    cp backend/law_review.db /opt/backup/law_review_$(date +%F_%H%M%S).db
+fi
+if [ -d backend/storage ]; then
+    tar -czf /opt/backup/storage_$(date +%F_%H%M%S).tar.gz backend/storage
+fi
+
+# 4) 拉取最新代码
+git fetch --all
+git checkout main
+git pull --rebase origin main
+
+# 5) 后端依赖与迁移
+cd backend
+source venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head
+
+# 6) 前端依赖与构建
+cd ../frontend
+npm ci
+npm run build
+
+# 7) 重启服务
+sudo systemctl restart law-review-api
+sudo systemctl restart law-review-web
+sudo systemctl restart nginx
+
+# 8) 检查服务与健康状态
+sudo systemctl status law-review-api law-review-web nginx --no-pager
+curl -I http://127.0.0.1:8000/health
+curl -I https://aliyun
+```
+
+### 11.2 Docker Compose 更新流程
+
+若后端使用 `docker-compose.prod.yml` 部署，可用：
+
+```bash
+cd /opt/pku_law_review_platform
+git fetch --all
+git checkout main
+git pull --rebase origin main
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs -f --tail=200 backend
+```
+
+### 11.3 回滚
+
+```bash
+cd /opt/pku_law_review_platform
+git checkout <旧版本tag或commit>
+
+# 与更新流程相同：重装依赖、迁移到对应版本、重建前端、重启服务
+```
+
+如涉及不可逆数据库变更，优先使用第 3 步中的备份恢复数据库。
+
+### 11.4 Cloudflare 检查项
+
+- DNS A 记录 `aliyun` 指向 aliyun
+- SSL/TLS 模式建议 `Full (strict)`
+- 更新前端后如静态资源缓存异常，可执行一次 `Purge Cache`
 
 ---
 

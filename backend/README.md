@@ -35,6 +35,12 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ## 生产部署建议
 
+生产实例参考：
+
+- 域名：`aliyun`
+- 服务器：`aliyun`
+- 仓库：`https://github.com/SmallsmallQ/pku_law_review_platform`
+
 ### 1. PostgreSQL
 
 生产环境必须配置：
@@ -96,6 +102,31 @@ python -m scripts.job_worker
 - `POST /api/v1/editor/manuscripts/{id}/ai-review/jobs`
 - `POST /api/v1/editor/manuscripts/{id}/revision-draft/jobs`
 - `POST /api/v1/editor/manuscripts/{id}/files/{version_id}/preview-pdf/jobs`
+
+### 6. 已部署旧版本时更新后端
+
+```bash
+# 进入项目目录
+cd /opt/pku_law_review_platform || cd /srv/pku_law_review_platform
+
+# 拉取代码
+git fetch --all
+git checkout main
+git pull --rebase origin main
+
+# 更新后端依赖 + 数据迁移
+cd backend
+source venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head
+
+# 重启后端服务
+sudo systemctl restart law-review-api
+sudo systemctl status law-review-api --no-pager
+
+# 健康检查
+curl -I http://127.0.0.1:8000/health
+```
 
 ## 阿里云百炼（大模型）
 
