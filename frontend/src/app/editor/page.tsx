@@ -19,6 +19,7 @@ import {
   Typography,
   message,
 } from "antd";
+import type { StepsProps } from "antd";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
 import MarkdownRenderer from "@/components/ui/MarkdownRenderer";
@@ -203,7 +204,7 @@ export default function EditorWorkbenchPage() {
   const availableActions = detail?.available_actions ?? [];
   const assignments = detail?.assignments ?? [];
   const flowCurrentIndex = currentStage ? STAGE_TO_STEP_INDEX[currentStage] ?? (FLOW_STEP_INDEX[status ?? ""] ?? 0) : (FLOW_STEP_INDEX[status ?? ""] ?? 0);
-  const progressItems = [
+  const progressItems: NonNullable<StepsProps["items"]> = [
     {
       title: "投稿入库",
       subTitle: "作者提交",
@@ -245,7 +246,7 @@ export default function EditorWorkbenchPage() {
               ? "process"
               : "wait",
     },
-  ] as const;
+  ];
   const availableActionLabels = availableActions.map((action) => ACTION_LABEL_MAP[action] ?? action);
 
   const timelineItems = useMemo(
@@ -436,9 +437,8 @@ export default function EditorWorkbenchPage() {
                     <Steps
                       current={flowCurrentIndex}
                       size="small"
-                      variant="outlined"
                       responsive
-                      items={progressItems}
+                      items={[...progressItems]}
                     />
                     <div className="mt-4 text-xs text-[#667085] leading-6">
                       {availableActionLabels.length > 0

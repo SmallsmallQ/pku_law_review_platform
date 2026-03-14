@@ -149,11 +149,11 @@ async function fetchPublicationRank(name: string): Promise<EasyScholarRank> {
           if (info) {
             let rankText = "";
             switch(rankIdx) {
-              case 1: rankText = info.oneRankText; break;
-              case 2: rankText = info.twoRankText; break;
-              case 3: rankText = info.threeRankText; break;
-              case 4: rankText = info.fourRankText; break;
-              case 5: rankText = info.fiveRankText; break;
+              case 1: rankText = info.oneRankText ?? ""; break;
+              case 2: rankText = info.twoRankText ?? ""; break;
+              case 3: rankText = info.threeRankText ?? ""; break;
+              case 4: rankText = info.fourRankText ?? ""; break;
+              case 5: rankText = info.fiveRankText ?? ""; break;
             }
 
             const isNegativeDataset = uuid === MONITOR_UUIDS.NEGATIVE;

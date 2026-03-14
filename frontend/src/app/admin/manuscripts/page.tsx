@@ -366,7 +366,6 @@ export default function AdminManuscriptsPage() {
                 setAssignReviewerSearch("");
               }}
               className="w-full"
-              autoComplete="off"
               notFoundContent={
                 reviewersLoading ? (
                   <div className="py-3 text-center"><Spin size="small" /></div>

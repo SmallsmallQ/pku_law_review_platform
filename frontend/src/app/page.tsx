@@ -326,7 +326,6 @@ export default function HomePage() {
                 >
                   <Steps
                     current={1}
-                    variant="outlined"
                     responsive
                     items={workflowItems.map((item, index) => ({
                       title: <span className="text-base font-semibold text-gray-900">{item.title}</span>,

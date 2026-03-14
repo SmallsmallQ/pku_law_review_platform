@@ -27,7 +27,7 @@
 |--------|------|
 | 前端   | Next.js 14（App Router）+ TypeScript + Tailwind CSS + Ant Design 5 |
 | 后端   | FastAPI + SQLAlchemy 2 + JWT |
-| 数据库 | **已整合在项目内**：默认 SQLite（单文件，无需装数据库），生产可换 PostgreSQL |
+| 数据库 | **开发默认 SQLite**（单文件，无需装数据库）；**生产必须 PostgreSQL** |
 | 文件   | 本地目录（可扩展 MinIO/OSS） |
 | AI     | 阿里云百炼（OpenAI 兼容接口，可选） |
 
@@ -50,7 +50,7 @@
 
 - **Node.js** 18+（前端，推荐 20/22 LTS；不建议 25+）
 - **Python** 3.10+（后端）
-- **无需单独安装数据库**：项目内置 SQLite，数据存成后端目录下一个文件；生产环境如需再换 PostgreSQL。
+- **开发环境无需单独安装数据库**：项目内置 SQLite，数据存成后端目录下一个文件；**生产环境必须使用 PostgreSQL**。
 
 ---
 
@@ -88,8 +88,8 @@ chmod +x scripts/start.sh   # 只需执行一次
 
 | 变量 | 说明 | 默认 |
 |------|------|------|
-| `DATABASE_URL` | 数据库连接；**不配则用项目内置 SQLite**（`backend/law_review.db`），无需单独建库 | `sqlite:///./law_review.db` |
-| `USE_SQLITE` | 为 `true` 时强制 SQLite（例如本机未装 PostgreSQL 时） | `false` |
+| `DATABASE_URL` | 数据库连接；开发环境不配则回落到项目内置 SQLite（`backend/law_review.db`） | `sqlite:///./law_review.db` |
+| `USE_SQLITE` | 为 `true` 时强制 SQLite（仅开发/测试环境可用） | `false` |
 | `SECRET_KEY` | JWT 密钥，生产务必修改 | `change-me-in-production` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token 有效期（分钟） | 1440 |
 | `STORAGE_TYPE` | 存储类型：`local` | `local` |

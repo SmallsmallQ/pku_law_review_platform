@@ -70,9 +70,6 @@ const theme: ThemeConfig = {
     Alert: {
       borderRadiusLG: 18,
     },
-    Pagination: {
-      itemBorderRadius: 14,
-    },
     Form: {
       labelFontSize: 14,
     },

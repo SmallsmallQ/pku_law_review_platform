@@ -13,6 +13,26 @@ if [ ! -f backend/.env ]; then
   exit 1
 fi
 
+if ! grep -Eq '^DATABASE_URL=postgresql(\\+[^:]+)?://' backend/.env; then
+  echo "[ERROR] 生产环境必须在 backend/.env 中配置 PostgreSQL DATABASE_URL。当前代码会拒绝 SQLite。"
+  exit 1
+fi
+
+if grep -Eq '^DEBUG=true' backend/.env; then
+  echo "[ERROR] 生产环境请将 backend/.env 中的 DEBUG 设为 false。"
+  exit 1
+fi
+
+if grep -Eq '^USE_SQLITE=true' backend/.env; then
+  echo "[ERROR] 生产环境请移除 USE_SQLITE=true，并改用 PostgreSQL DATABASE_URL。"
+  exit 1
+fi
+
+if grep -Eq '^SECRET_KEY=change-me-in-production$|^SECRET_KEY=your-secret-key-change-in-production$|^SECRET_KEY=local-dev-secret-key-change-in-production$' backend/.env; then
+  echo "[ERROR] 生产环境必须把 SECRET_KEY 改成随机长字符串。"
+  exit 1
+fi
+
 # 检查前端是否已构建
 if [ ! -d frontend/.next ]; then
   echo "[ERROR] 请先执行: cd frontend && npm ci && npm run build"

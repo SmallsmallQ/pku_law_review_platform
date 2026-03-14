@@ -34,6 +34,7 @@ import {
   Tag,
   Typography,
 } from "antd";
+import type { StepsProps } from "antd";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
 import TypewriterMarkdown from "@/components/ui/TypewriterMarkdown";
@@ -258,9 +259,8 @@ export default function EditorManuscriptDetailPage() {
           : status === "revised_submitted"
             ? <SyncOutlined className="text-[#d97706]" />
             : <ClockCircleOutlined className="text-[#98a2b3]" />;
-  const flowItems = [
+  const flowItems: NonNullable<StepsProps["items"]> = [
     {
-      key: "submitted",
       title: "投稿入库",
       subTitle: "作者提交",
       description: status === "draft" ? "稿件仍处于草稿状态，尚未进入正式编审流程。" : "稿件已进入系统，等待编辑部启动流程。",
@@ -268,7 +268,6 @@ export default function EditorManuscriptDetailPage() {
       status: flowCurrentIndex > 0 ? "finish" : (status === "draft" ? "process" : "finish"),
     },
     {
-      key: "internal",
       title: "内审",
       subTitle: currentStage === "internal" ? "当前阶段" : "阶段一",
       description: currentStage === "internal"
@@ -282,7 +281,6 @@ export default function EditorManuscriptDetailPage() {
           : "wait",
     },
     {
-      key: "external",
       title: "外审",
       subTitle: currentStage === "external" ? "当前阶段" : "阶段二",
       description: currentStage === "external"
@@ -296,7 +294,6 @@ export default function EditorManuscriptDetailPage() {
           : "wait",
     },
     {
-      key: "final",
       title: "终审",
       subTitle: currentStage === "final" ? "当前阶段" : "阶段三",
       description: status === "revision_requested"
@@ -312,7 +309,6 @@ export default function EditorManuscriptDetailPage() {
           : "wait",
     },
     {
-      key: "result",
       title: "结果归档",
       subTitle:
         status === "accepted"
@@ -344,7 +340,7 @@ export default function EditorManuscriptDetailPage() {
               ? "process"
               : "wait",
     },
-  ] as const;
+  ];
 
   const jumpToAiDetect = useCallback(() => {
     if (!id) return;
@@ -352,35 +348,44 @@ export default function EditorManuscriptDetailPage() {
   }, [id, router]);
 
   const currentStageAction = availableActions.find((action) => action.startsWith("submit_"));
-  const helperActions = [
+  type EditorActionButton = {
+    key: string;
+    label: string;
+    onClick: () => void;
+    type?: "primary" | "default";
+    danger?: boolean;
+    loading?: boolean;
+  };
+
+  const helperActions: EditorActionButton[] = [
     { key: "ai_review", label: "生成 AI 初审报告", onClick: runAiReview, type: "primary" as const, loading: aiReviewLoading },
     { key: "ai_detect", label: "前往 AI 检测", onClick: jumpToAiDetect },
     { key: "ai_assistant", label: "AI 助手", onClick: () => setAiAssistantOpen(true) },
   ];
-  const stageActions = [
-    currentStageAction === "submit_internal_review"
-      ? { key: "submit_internal_review", label: "提交内审", onClick: () => runAction("submit_internal_review"), type: "primary" as const }
-      : null,
-    currentStageAction === "submit_external_review"
-      ? { key: "submit_external_review", label: "提交外审", onClick: () => runAction("submit_external_review"), type: "primary" as const }
-      : null,
-    currentStageAction === "submit_final_submission"
-      ? { key: "submit_final_submission", label: "提交成稿", onClick: () => runAction("submit_final_submission"), type: "primary" as const }
-      : null,
-  ].filter(Boolean);
-  const interventionActions = [
-    availableActions.includes("revision_request")
-      ? { key: "revision_request", label: "发起退修", onClick: () => { setRevisionModalOpen(true); setRevisionDraftError(null); } }
-      : null,
-    availableActions.includes("reject")
-      ? { key: "reject", label: "退稿", onClick: () => setRejectConfirmOpen(true), danger: true }
-      : null,
-  ].filter(Boolean);
-  const terminalActions = [
-    availableActions.includes("accept")
-      ? { key: "accept", label: "录用", onClick: () => runAction("accept"), type: "primary" as const }
-      : null,
-  ].filter(Boolean);
+  const stageActions: EditorActionButton[] = [
+    ...(currentStageAction === "submit_internal_review"
+      ? [{ key: "submit_internal_review", label: "提交内审", onClick: () => runAction("submit_internal_review"), type: "primary" as const }]
+      : []),
+    ...(currentStageAction === "submit_external_review"
+      ? [{ key: "submit_external_review", label: "提交外审", onClick: () => runAction("submit_external_review"), type: "primary" as const }]
+      : []),
+    ...(currentStageAction === "submit_final_submission"
+      ? [{ key: "submit_final_submission", label: "提交成稿", onClick: () => runAction("submit_final_submission"), type: "primary" as const }]
+      : []),
+  ];
+  const interventionActions: EditorActionButton[] = [
+    ...(availableActions.includes("revision_request")
+      ? [{ key: "revision_request", label: "发起退修", onClick: () => { setRevisionModalOpen(true); setRevisionDraftError(null); } }]
+      : []),
+    ...(availableActions.includes("reject")
+      ? [{ key: "reject", label: "退稿", onClick: () => setRejectConfirmOpen(true), danger: true }]
+      : []),
+  ];
+  const terminalActions: EditorActionButton[] = [
+    ...(availableActions.includes("accept")
+      ? [{ key: "accept", label: "录用", onClick: () => runAction("accept"), type: "primary" as const }]
+      : []),
+  ];
 
   const submitStructuredReview = useCallback(async () => {
     if (!id || !currentStage) return;
@@ -662,11 +667,10 @@ export default function EditorManuscriptDetailPage() {
                           </Text>
                         </div>
                         <Steps
-                          orientation="vertical"
+                          direction="vertical"
                           size="small"
-                          variant="outlined"
                           current={flowCurrentIndex}
-                          items={flowItems}
+                          items={[...flowItems]}
                         />
                       </div>
 

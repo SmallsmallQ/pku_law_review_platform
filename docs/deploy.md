@@ -35,7 +35,7 @@
 | 系统 | Linux（推荐 Ubuntu 22.04 LTS / Debian 12） |
 | Node.js | 18+，推荐 20 或 22 LTS |
 | Python | 3.10+ |
-| 数据库 | 内置 SQLite 即可；正式生产建议 PostgreSQL |
+| 数据库 | 生产环境必须使用 PostgreSQL |
 | 内存 | 建议 ≥ 2GB；若启用 AI 报告且并发多，建议 4GB+ |
 
 ---
@@ -117,7 +117,7 @@ CORS_ORIGINS=["https://aliyun"]
 
 **可选：**
 
-- 使用 **PostgreSQL**：设置 `DATABASE_URL=postgresql://用户:密码@主机:5432/库名`，并安装 `psycopg2-binary`（已在 requirements 中）。不设则使用项目内 SQLite。
+- 使用 **PostgreSQL**：设置 `DATABASE_URL=postgresql://用户:密码@主机:5432/库名`，并安装 `psycopg2-binary`（已在 requirements 中）。当前代码会在 `ENVIRONMENT=production` 时拒绝 SQLite。
 - **文件存储**：`STORAGE_TYPE=local`、`STORAGE_LOCAL_PATH` 指向服务器上持久化目录（如 `/var/data/law_review/storage`），需保证进程有写权限。
 - **AI 初审**：填写 `DASHSCOPE_API_KEY`、按需调整 `LLM_BASE_URL` 与 `LLM_MODEL`。
 

@@ -262,8 +262,8 @@ export default function AdminDashboardPage() {
     <div className="bg-white w-full max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8 space-y-10 min-h-screen text-[#1d1d1f]">
       {/* Header Section */}
       <section className="pb-6 border-b border-[#e5e7eb]">
-        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">
-          <div className="max-w-3xl">
+        <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-6">
+          <div className="min-w-0 flex-1 max-w-3xl">
             <Text className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8B1538] mb-2 block">
               Admin Console
             </Text>
@@ -274,8 +274,8 @@ export default function AdminDashboardPage() {
               统一查看稿件积压、用户结构、栏目配置和最近处理记录。保留现有业务逻辑，后台首页同样回归无卡片的扁平化结构。
             </Paragraph>
           </div>
-          <Card className="shrink-0" styles={{ body: { padding: 16 } }}>
-            <Descriptions column={2} size="small" className="mb-0">
+          <Card className="w-full xl:w-[420px] xl:flex-none" styles={{ body: { padding: 16 } }}>
+            <Descriptions column={{ xs: 1, sm: 2 }} size="small" className="mb-0">
               <Descriptions.Item label="待处理稿件">{stats.manuscripts_pending} 篇</Descriptions.Item>
               <Descriptions.Item label="系统总用户">{totalUsers} 人</Descriptions.Item>
               <Descriptions.Item label="栏目配置数">{stats.sections_count} 个</Descriptions.Item>
