@@ -1,5 +1,5 @@
 """
-SQLAlchemy 声明基类与表结构创建。初版同步引擎（需 psycopg2，勿用 asyncpg）。
+SQLAlchemy 声明基类与数据库连接。
 """
 from pathlib import Path
 
@@ -8,29 +8,20 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.config import settings
 
-# 同步脚本与 Session 必须用同步驱动；若 DATABASE_URL 为 postgresql+asyncpg 则改为 postgresql（psycopg2）
-if getattr(settings, "use_sqlite", False):
-    if str(settings.database_url).startswith("sqlite"):
-        _sync_url = settings.database_url
-    else:
-        fallback_sqlite_path = (Path(__file__).resolve().parent.parent.parent / "law_review.db").as_posix()
-        _sync_url = f"sqlite:///{fallback_sqlite_path}"
-else:
-    _sync_url = settings.database_url
-if "+asyncpg" in _sync_url:
-    _sync_url = _sync_url.replace("postgresql+asyncpg", "postgresql", 1)
 
-# 兼容相对 SQLite 路径：统一转为 backend 目录下的绝对路径，避免不同启动目录连错库。
-if _sync_url.startswith("sqlite:///") and not _sync_url.startswith("sqlite:////"):
-    sqlite_path = _sync_url[len("sqlite:///") :]
-    if sqlite_path and sqlite_path != ":memory:" and not Path(sqlite_path).is_absolute():
-        backend_root = Path(__file__).resolve().parent.parent.parent
-        sqlite_abs = (backend_root / sqlite_path).resolve().as_posix()
-        _sync_url = f"sqlite:///{sqlite_abs}"
+def _normalize_sync_database_url(raw_url: str) -> str:
+    sync_url = raw_url
+    if sync_url.startswith("sqlite:///") and not sync_url.startswith("sqlite:////"):
+        sqlite_path = sync_url[len("sqlite:///") :]
+        if sqlite_path and sqlite_path != ":memory:" and not Path(sqlite_path).is_absolute():
+            backend_root = Path(__file__).resolve().parent.parent.parent
+            sqlite_abs = (backend_root / sqlite_path).resolve().as_posix()
+            sync_url = f"sqlite:///{sqlite_abs}"
+    return sync_url
 
-_connect_args = {}
-if _sync_url.startswith("sqlite"):
-    _connect_args["check_same_thread"] = False
+
+_sync_url = _normalize_sync_database_url(settings.sync_database_url)
+_connect_args = {"check_same_thread": False} if _sync_url.startswith("sqlite") else {}
 
 engine = create_engine(
     _sync_url,
@@ -95,15 +86,25 @@ def get_db():
         db.close()
 
 
+def db_healthcheck() -> bool:
+    """执行最小化连通性检查，供 readiness probe 使用。"""
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+    return True
+
+
 def _column_exists(conn, table_name: str, column_name: str) -> bool:
     rows = conn.execute(text(f'PRAGMA table_info("{table_name}")')).mappings().all()
     return any(str(r.get("name", "")).lower() == column_name.lower() for r in rows)
 
 
 def _apply_sqlite_compat_migrations() -> None:
-    if engine.dialect.name != "sqlite":
+    if settings.is_production or engine.dialect.name != "sqlite":
         return
     with engine.begin() as conn:
+        background_jobs = Base.metadata.tables.get("background_jobs")
+        if background_jobs is not None:
+            background_jobs.create(bind=conn, checkfirst=True)
         if not _column_exists(conn, "manuscripts", "current_review_stage"):
             conn.execute(text('ALTER TABLE manuscripts ADD COLUMN current_review_stage VARCHAR(20)'))
         if _column_exists(conn, "manuscripts", "status"):
@@ -125,6 +126,8 @@ def _apply_sqlite_compat_migrations() -> None:
 
 def init_db():
     """创建所有表（开发/测试用；生产建议用 Alembic 迁移）。"""
+    if settings.is_production:
+        raise RuntimeError("生产环境禁止调用 init_db()，请使用 Alembic 迁移。")
     import app.models  # noqa: F401 — 注册所有表
     Base.metadata.create_all(bind=engine)
     _apply_sqlite_compat_migrations()

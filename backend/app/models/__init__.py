@@ -14,6 +14,7 @@ from app.models.parser_models import (
     KnowledgeChunk,
 )
 from app.models.editor_action import EditorAction
+from app.models.background_job import BackgroundJob
 from app.models.revision_template import RevisionTemplate
 from app.models.system_config import SystemConfig
 
@@ -30,6 +31,7 @@ __all__ = [
     "SimilarityResult",
     "KnowledgeChunk",
     "EditorAction",
+    "BackgroundJob",
     "RevisionTemplate",
     "SystemConfig",
 ]

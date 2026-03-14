@@ -10,7 +10,7 @@ const theme: ThemeConfig = {
     colorBorderSecondary: "#e5e7eb",
     colorText: "#1f2937",
     colorTextSecondary: "#667085",
-    borderRadius: 10,
+    borderRadius: 16,
     controlHeight: 36,
     controlHeightLG: 40,
     fontSize: 14,
@@ -26,7 +26,9 @@ const theme: ThemeConfig = {
   components: {
     Button: {
       primaryShadow: "none",
-      borderRadius: 8,
+      defaultShadow: "none",
+      dangerShadow: "none",
+      borderRadius: 999,
     },
     Menu: {
       itemSelectedBg: "transparent",
@@ -50,9 +52,26 @@ const theme: ThemeConfig = {
     Card: {
       headerFontSize: 15,
       colorBorderSecondary: "#e5e7eb",
+      borderRadiusLG: 24,
     },
     Input: {
       fontSize: 14,
+      borderRadius: 16,
+    },
+    Select: {
+      borderRadius: 16,
+    },
+    Modal: {
+      borderRadiusLG: 24,
+    },
+    Drawer: {
+      borderRadiusLG: 24,
+    },
+    Alert: {
+      borderRadiusLG: 18,
+    },
+    Pagination: {
+      itemBorderRadius: 14,
     },
     Form: {
       labelFontSize: 14,

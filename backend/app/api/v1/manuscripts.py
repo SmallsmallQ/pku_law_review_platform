@@ -17,12 +17,15 @@ from app.core.storage import ALLOWED_EXTENSIONS, resolve_path, save_manuscript_f
 from app.db.base import get_db
 from app.models import EditorAction, Manuscript, ManuscriptAssignment, ManuscriptVersion, ManuscriptParsed, User
 from app.services.parser import parse_manuscript
-from app.services.review_service import process_manuscript_parsing
+from app.config import settings
+from app.schemas.job import BackgroundJobResponse
+from app.services.job_queue import enqueue_parse_job_for_version, run_job, serialize_job
 from app.schemas.manuscript import (
     AccessibleManuscriptListItem,
     ManuscriptCreateResponse,
     ManuscriptDetailResponse,
     ManuscriptListItem,
+    ManuscriptRevisionUploadResponse,
     ManuscriptVersionBrief,
     RevisionRequestItem,
 )
@@ -244,14 +247,17 @@ def create_manuscript(
     db.commit()
     
     # 异步解析
+    job = enqueue_parse_job_for_version(db, version_id=version.id, manuscript_id=manuscript.id, created_by=user.id)
     if background_tasks:
-        background_tasks.add_task(process_manuscript_parsing, db, version.id)
+        if not settings.is_production:
+            background_tasks.add_task(run_job, job.id)
     
     db.refresh(manuscript)
     db.refresh(version)
     return ManuscriptCreateResponse(
         manuscript=_manuscript_detail(manuscript),
         version=_version_brief(version),
+        parse_job=BackgroundJobResponse(**serialize_job(job)),
     )
 
 
@@ -466,7 +472,7 @@ def revision_requests(
 
 
 # ---------- 上传修订稿 ----------
-@router.post("/{id}/versions", response_model=ManuscriptVersionBrief)
+@router.post("/{id}/versions", response_model=ManuscriptRevisionUploadResponse)
 def upload_revision(
     id: int,
     db: Annotated[Session, Depends(get_db)],
@@ -507,11 +513,16 @@ def upload_revision(
     db.commit()
 
     # 异步解析
+    job = enqueue_parse_job_for_version(db, version_id=version.id, manuscript_id=id, created_by=user.id)
     if background_tasks:
-        background_tasks.add_task(process_manuscript_parsing, db, version.id)
+        if not settings.is_production:
+            background_tasks.add_task(run_job, job.id)
 
     db.refresh(version)
-    return _version_brief(version)
+    return ManuscriptRevisionUploadResponse(
+        version=_version_brief(version),
+        parse_job=BackgroundJobResponse(**serialize_job(job)),
+    )
 
 
 # ---------- 下载某版本文件（支持 Query token，便于前端 <a> 下载） ----------

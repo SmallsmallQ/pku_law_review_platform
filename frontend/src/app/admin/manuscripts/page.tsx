@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Checkbox, Input, Modal, Select, Space, Table, Tag, message } from "antd";
+import { Button, Checkbox, Input, Modal, Select, Space, Spin, Table, Tag, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { REVIEW_STAGE_MAP, ROLE_MAP, STATUS_MAP } from "@/lib/constants";
 import { adminApi, type AdminManuscriptItem, type AdminUserItem, type SectionItem } from "@/services/api";
@@ -13,6 +13,8 @@ export default function AdminManuscriptsPage() {
   const [list, setList] = useState<AdminManuscriptItem[]>([]);
   const [sections, setSections] = useState<SectionItem[]>([]);
   const [reviewers, setReviewers] = useState<AdminUserItem[]>([]);
+  const [reviewersLoading, setReviewersLoading] = useState(false);
+  const [reviewersError, setReviewersError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -27,6 +29,7 @@ export default function AdminManuscriptsPage() {
   const [assignTarget, setAssignTarget] = useState<AdminManuscriptItem | null>(null);
   const [assignStage, setAssignStage] = useState<string>("internal");
   const [assignReviewerId, setAssignReviewerId] = useState<number | null>(null);
+  const [assignReviewerSearch, setAssignReviewerSearch] = useState("");
   const [assignNote, setAssignNote] = useState("");
   const [activateStage, setActivateStage] = useState(true);
 
@@ -52,10 +55,24 @@ export default function AdminManuscriptsPage() {
     load();
   }, [load]);
 
+  const loadReviewers = useCallback(async () => {
+    setReviewersLoading(true);
+    setReviewersError(null);
+    try {
+      const res = await adminApi.users({ page_size: 200, is_active: true });
+      setReviewers(res.items);
+    } catch (e) {
+      setReviewers([]);
+      setReviewersError(e instanceof Error ? e.message : "加载审稿人失败");
+    } finally {
+      setReviewersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     adminApi.sections().then((res) => setSections(res.items)).catch(() => setSections([]));
-    adminApi.users({ page_size: 200, is_active: true }).then((res) => setReviewers(res.items)).catch(() => setReviewers([]));
-  }, []);
+    void loadReviewers();
+  }, [loadReviewers]);
 
   const runAction = (id: number, actionType: string, comment?: string) => {
     setActionLoadingId(id);
@@ -79,15 +96,28 @@ export default function AdminManuscriptsPage() {
     return reviewers.filter((item) => allowedRoles.includes(item.role));
   }, [assignStage, reviewers]);
 
+  const filteredEligibleReviewers = useMemo(() => {
+    const keywordText = assignReviewerSearch.trim().toLowerCase();
+    if (!keywordText) {
+      return eligibleReviewers;
+    }
+    return eligibleReviewers.filter((item) => {
+      const label = `${item.real_name || item.email} ${ROLE_MAP[item.role] ?? item.role}`.toLowerCase();
+      return label.includes(keywordText);
+    });
+  }, [assignReviewerSearch, eligibleReviewers]);
+
   const openAssignModal = (record: AdminManuscriptItem, stage?: string) => {
     const nextStage = stage || record.current_review_stage || "internal";
     const existing = record.assignments.find((item) => item.review_stage === nextStage);
     setAssignTarget(record);
     setAssignStage(nextStage);
     setAssignReviewerId(existing?.reviewer_id ?? null);
+    setAssignReviewerSearch("");
     setAssignNote(existing?.note ?? "");
     setActivateStage(true);
     setAssignModalOpen(true);
+    void loadReviewers();
   };
 
   const submitAssignment = async () => {
@@ -107,6 +137,7 @@ export default function AdminManuscriptsPage() {
       setAssignModalOpen(false);
       setAssignTarget(null);
       setAssignReviewerId(null);
+      setAssignReviewerSearch("");
       setAssignNote("");
       load();
     } catch (e) {
@@ -296,6 +327,7 @@ export default function AdminManuscriptsPage() {
           setAssignModalOpen(false);
           setAssignTarget(null);
           setAssignReviewerId(null);
+          setAssignReviewerSearch("");
           setAssignNote("");
         }}
         onOk={submitAssignment}
@@ -306,7 +338,15 @@ export default function AdminManuscriptsPage() {
         <div className="space-y-4">
           <div>
             <div className="mb-1 text-sm text-[#666]">审稿阶段</div>
-            <Select value={assignStage} onChange={(value) => { setAssignStage(value); setAssignReviewerId(null); }} className="w-full">
+            <Select
+              value={assignStage}
+              onChange={(value) => {
+                setAssignStage(value);
+                setAssignReviewerId(null);
+                setAssignReviewerSearch("");
+              }}
+              className="w-full"
+            >
               <Select.Option value="internal">内审</Select.Option>
               <Select.Option value="external">外审</Select.Option>
               <Select.Option value="final">终审</Select.Option>
@@ -316,15 +356,42 @@ export default function AdminManuscriptsPage() {
             <div className="mb-1 text-sm text-[#666]">审稿人</div>
             <Select
               showSearch
-              optionFilterProp="label"
+              filterOption={false}
+              loading={reviewersLoading}
+              searchValue={assignReviewerSearch}
+              onSearch={setAssignReviewerSearch}
               value={assignReviewerId ?? undefined}
-              onChange={(value) => setAssignReviewerId(value)}
+              onChange={(value) => {
+                setAssignReviewerId(value);
+                setAssignReviewerSearch("");
+              }}
               className="w-full"
-              options={eligibleReviewers.map((item) => ({
+              autoComplete="off"
+              notFoundContent={
+                reviewersLoading ? (
+                  <div className="py-3 text-center"><Spin size="small" /></div>
+                ) : reviewersError ? (
+                  <div className="px-3 py-2 text-sm text-red-500">{reviewersError}</div>
+                ) : (
+                  <div className="px-3 py-2 text-sm text-gray-400">当前阶段暂无可分配审稿人</div>
+                )
+              }
+              options={filteredEligibleReviewers.map((item) => ({
                 value: item.id,
                 label: `${item.real_name || item.email} · ${ROLE_MAP[item.role] ?? item.role}`,
               }))}
             />
+            {!reviewersLoading && !reviewersError && eligibleReviewers.length > 0 && (
+              <div className="mt-2 text-xs text-gray-400">
+                当前可选 {eligibleReviewers.length} 人
+                {assignReviewerSearch.trim() ? `，筛选后 ${filteredEligibleReviewers.length} 人` : ""}
+              </div>
+            )}
+            {reviewersError && (
+              <Button type="link" className="mt-1 px-0" onClick={() => void loadReviewers()}>
+                重新加载审稿人
+              </Button>
+            )}
           </div>
           <div>
             <div className="mb-1 text-sm text-[#666]">备注</div>

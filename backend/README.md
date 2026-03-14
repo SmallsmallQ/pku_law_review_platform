@@ -12,7 +12,7 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env       # 并修改 DATABASE_URL、SECRET_KEY、DASHSCOPE_API_KEY 等
 
-# 创建数据库表（首次或重置时）
+# 开发环境初始化数据库（SQLite/本地调试）
 python -m scripts.init_db
 
 # 可选：创建一名编辑账号便于测试
@@ -22,6 +22,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 - 健康检查：<http://localhost:8000/health>
+- Liveness：<http://localhost:8000/health/live>
+- Readiness：<http://localhost:8000/health/ready>
 - API 文档：<http://localhost:8000/docs>
 
 ## 目录说明
@@ -31,7 +33,69 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `app/core/` — 认证、安全等
 - `app/api/v1/` — 按模块拆分的路由（auth、manuscripts、editor、admin 等）
 
-数据库迁移与模型后续按 `docs/database-schema.md` 用 SQLAlchemy + Alembic 接入。
+## 生产部署建议
+
+### 1. PostgreSQL
+
+生产环境必须配置：
+
+- `ENVIRONMENT=production`
+- `DATABASE_URL=postgresql://...`
+- `SECRET_KEY=...`
+
+生产环境会拒绝：
+
+- SQLite fallback
+- 默认 `SECRET_KEY`
+- `INIT_DB_ON_STARTUP=true`
+
+### 2. Alembic 迁移
+
+首次部署或升级时使用：
+
+```bash
+alembic upgrade head
+```
+
+生成新迁移：
+
+```bash
+alembic revision --autogenerate -m "describe change"
+```
+
+### 3. 对象存储
+
+默认使用本地目录。若部署到多实例/容器环境，建议改为 `STORAGE_TYPE=minio` 或 `STORAGE_TYPE=s3`，并配置：
+
+- `STORAGE_BUCKET`
+- `STORAGE_ACCESS_KEY`
+- `STORAGE_SECRET_KEY`
+- `STORAGE_ENDPOINT`（MinIO 必填，S3 可选）
+
+### 4. 慢任务
+
+当前慢任务已经拆成数据库持久化 job + 独立 worker：
+
+- 稿件解析
+- AI 初审报告
+- 退修意见草稿
+- Word 预览 PDF 生成
+
+本地可直接启动 worker：
+
+```bash
+python -m scripts.job_worker
+```
+
+生产容器编排样板见项目根目录 `docker-compose.prod.yml`。
+
+### 5. 异步任务接口
+
+可通过以下接口入队，再轮询 `GET /api/v1/jobs/{job_id}`：
+
+- `POST /api/v1/editor/manuscripts/{id}/ai-review/jobs`
+- `POST /api/v1/editor/manuscripts/{id}/revision-draft/jobs`
+- `POST /api/v1/editor/manuscripts/{id}/files/{version_id}/preview-pdf/jobs`
 
 ## 阿里云百炼（大模型）
 

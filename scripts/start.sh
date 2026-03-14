@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一键启动：自动安装依赖、建表、启动后端+前端。Ctrl+C 会同时停掉后端。
+# 一键启动：自动安装依赖、建表、启动后端 API + 后台 worker + 前端。
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -39,7 +39,7 @@ fi
 
 # 2. 后端依赖（首次或依赖缺失时安装）
 echo "[OK] 检查后端依赖..."
-(cd backend && pip install -q -r requirements.txt)
+(cd backend && python3 -m pip install -q -r requirements.txt)
 
 # 3. 初始化数据库
 echo "[OK] 初始化数据库..."
@@ -55,20 +55,25 @@ cd "$ROOT"
 
 # 5. 启动后端（后台）
 cd "$ROOT/backend"
-uvicorn app.main:app --reload --port 8000 &
+python3 -m uvicorn app.main:app --reload --port 8000 &
 BACKEND_PID=$!
+python3 -m scripts.job_worker &
+WORKER_PID=$!
 cd "$ROOT"
 echo "[OK] 后端已启动 (PID $BACKEND_PID)，http://localhost:8000"
+echo "[OK] 后台任务 worker 已启动 (PID $WORKER_PID)"
 
-cleanup_backend() {
+cleanup_processes() {
+  kill "$WORKER_PID" 2>/dev/null || true
+  pkill -P "$WORKER_PID" 2>/dev/null || true
   kill "$BACKEND_PID" 2>/dev/null || true
   pkill -P "$BACKEND_PID" 2>/dev/null || true
-  echo "已停止后端"
+  echo "已停止后端与 worker"
 }
 
 # 退出时杀掉后端（含重载子进程）
-trap "cleanup_backend; exit" INT TERM
-trap "cleanup_backend" EXIT
+trap "cleanup_processes; exit" INT TERM
+trap "cleanup_processes" EXIT
 
 # 6. 启动前端（前台，阻塞）
 echo "[OK] 启动前端，http://localhost:3000"

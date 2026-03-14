@@ -5,16 +5,17 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Alert,
+  Button,
   Checkbox,
+  Card,
   Col,
   Descriptions,
-  List,
   Divider,
   Form,
   Input,
+  List,
   Row,
   Select,
-  Button,
   Spin,
   Space,
   Tag,
@@ -22,7 +23,7 @@ import {
   Upload,
 } from "antd";
 import type { UploadFile } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
+import { InboxOutlined } from "@ant-design/icons";
 import HeaderBar from "@/components/HeaderBar";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -166,8 +167,14 @@ export default function SubmitPage() {
       fd.append("contact", correspondingAuthor.phone || correspondingAuthor.email || String(values.contact ?? ""));
       fd.append("submit", "true");
       fd.append("file", file);
-      await manuscriptsApi.create(fd);
-      router.push("/author?submitted=1");
+      const res = await manuscriptsApi.create(fd);
+      const manuscriptId = Number(res.manuscript?.id);
+      const parseJobId = Number(res.parse_job?.id);
+      const query = new URLSearchParams({ submitted: "1" });
+      if (Number.isFinite(parseJobId) && parseJobId > 0) {
+        query.set("parseJobId", String(parseJobId));
+      }
+      router.push(Number.isFinite(manuscriptId) && manuscriptId > 0 ? `/author/${manuscriptId}?${query.toString()}` : `/author?submitted=1`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "投稿失败");
     } finally {
@@ -326,6 +333,24 @@ export default function SubmitPage() {
 
         <Divider className="mb-12 border-[#e5e7eb]" />
 
+        <section className="mb-10">
+          <Descriptions
+            title={<span className="text-[18px] font-medium text-[#1f2937]">操作人信息</span>}
+            bordered
+            size="middle"
+            column={{ xs: 1, md: 3 }}
+            className="bg-white"
+            styles={{
+              label: { width: 108, color: "#667085", backgroundColor: "#f8fafc" },
+              content: { color: "#1f2937" },
+            }}
+          >
+            <Descriptions.Item label="账号姓名">{user.real_name || "未填写"}</Descriptions.Item>
+            <Descriptions.Item label="注册邮箱">{user.email}</Descriptions.Item>
+            <Descriptions.Item label="默认单位">{user.institution || "未填写"}</Descriptions.Item>
+          </Descriptions>
+        </section>
+
         <Row gutter={[48, 48]} align="top">
           <Col xs={24} xl={16}>
             <Form
@@ -396,19 +421,25 @@ export default function SubmitPage() {
                     valuePropName="fileList"
                     getValueFromEvent={normFile}
                   >
-                    <Upload
+                    <Upload.Dragger
                       maxCount={1}
                       beforeUpload={() => false}
                       accept=".docx,.doc,.pdf"
                       fileList={fileList}
                       showUploadList={false}
                       className="w-full block"
+                      rootClassName="submit-upload"
                     >
-                      <Button icon={<UploadOutlined />} size="large" className="w-full text-left py-12 border-dashed border-2 bg-gray-50 hover:bg-gray-100 flex items-center justify-center flex-col gap-3 rounded-sm">
-                        <div className="text-gray-500 text-base">点击选择或拖拽文件到这里</div>
-                        <div className="text-gray-400 text-sm">支持 .doc / .docx / .pdf 格式，最大 {MAX_FILE_SIZE_MB}MB</div>
-                      </Button>
-                    </Upload>
+                      <p className="ant-upload-drag-icon !mb-3">
+                        <InboxOutlined className="text-[34px] text-[#8B1538]" />
+                      </p>
+                      <p className="ant-upload-text text-[16px] font-medium text-[#1f2937]">
+                        点击或拖拽稿件文件到此处上传
+                      </p>
+                      <p className="ant-upload-hint text-[13px] leading-6 text-[#667085]">
+                        支持单个主稿文件上传，仅接受 `.doc`、`.docx`、`.pdf` 格式，文件大小不超过 {MAX_FILE_SIZE_MB}MB。
+                      </p>
+                    </Upload.Dragger>
                   </Form.Item>
 
                   <div className="mt-6 bg-gray-50 p-5 rounded-sm border border-[#e5e7eb]">
@@ -629,25 +660,9 @@ export default function SubmitPage() {
           {/* 右侧信息面板 */}
           <Col xs={24} xl={8}>
             <Space direction="vertical" size={32} className="flex w-full xl:sticky xl:top-8 mt-12 xl:mt-0">
-              
-              <div className="bg-gray-50 p-6 rounded-sm border border-[#e5e7eb]">
-                <Title level={5} className="!font-medium !text-gray-900 !mt-0 !mb-4 flex items-center gap-2">
-                   操作人信息
-                </Title>
-                <Descriptions column={1} size="small" className="mb-0 text-sm">
-                  <Descriptions.Item label={<span className="text-gray-500">账号姓名</span>}>{user.real_name || "未填写"}</Descriptions.Item>
-                  <Descriptions.Item label={<span className="text-gray-500">注册邮箱</span>}>{user.email}</Descriptions.Item>
-                  <Descriptions.Item label={<span className="text-gray-500">默认单位</span>}>{user.institution || "未填写"}</Descriptions.Item>
-                </Descriptions>
-              </div>
-
-              <div>
-                <Title level={5} className="!font-medium !text-gray-900 !mt-0 !mb-4 border-b border-[#e5e7eb] pb-2">
-                  提交前自检清单
-                </Title>
+              <Card title="提交前自检清单" styles={{ body: { padding: 20 } }}>
                 <List
                   size="small"
-                  className="border-none"
                   dataSource={[
                     "文档标题、摘要、关键词已正确填写",
                     "稿件文件格式符合 DOC/DOCX/PDF 标准",
@@ -655,28 +670,26 @@ export default function SubmitPage() {
                     "作者署名顺序及通讯作者已确认",
                     "已阅读全文并勾选版权转让协议",
                   ]}
-                  renderItem={(item, i) => (
+                  renderItem={(item) => (
                     <List.Item className="!px-0 !border-b-0 py-1.5 flex items-start gap-2">
                        <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-green-50 text-green-600 text-xs shrink-0 mt-0.5">✓</span>
                        <span className="text-gray-600 text-sm leading-relaxed">{item}</span>
                     </List.Item>
                   )}
                 />
-              </div>
+              </Card>
 
-              <div className="bg-red-50/50 p-6 rounded-sm border border-red-100">
-                <Title level={5} className="!font-medium !text-[#8B1538] !mt-0 !mb-3">
-                  下一步提交流程
-                </Title>
-                <Text className="text-gray-600 text-sm leading-relaxed block mb-5">
-                  成功提交后，系统将自动对稿件进行机器初步解析，之后可随时在作者中心追踪稿件录用、外审情况及专家退修意见。
-                </Text>
-                <Link href="/author">
-                  <Button block className="rounded-sm border-red-200 text-[#8B1538] hover:!border-[#8B1538] hover:!text-[#8B1538]">
-                    前往我的作者中心
-                  </Button>
-                </Link>
-              </div>
+              <Alert
+                type="info"
+                showIcon
+                message="下一步提交流程"
+                description="成功提交后，系统将自动对稿件进行机器初步解析，之后可随时在作者中心追踪稿件录用、外审情况及专家退修意见。"
+                action={
+                  <Link href="/author">
+                    <Button size="small">前往我的作者中心</Button>
+                  </Link>
+                }
+              />
 
             </Space>
           </Col>

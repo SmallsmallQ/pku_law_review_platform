@@ -3,12 +3,20 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { Alert, Breadcrumb, Button, Typography, Upload, Divider } from "antd";
+import { Alert, Breadcrumb, Button, Typography, Upload, Divider, Descriptions } from "antd";
 import type { BreadcrumbItemType } from "antd/es/breadcrumb/Breadcrumb";
 import type { UploadFile } from "antd";
+import { InboxOutlined } from "@ant-design/icons";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
 import { manuscriptsApi } from "@/services/api";
+
+function formatBytes(size?: number) {
+  if (!size) return "-";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+}
 
 export default function AuthorRevisePage() {
   const { id } = useParams<{ id: string }>();
@@ -27,8 +35,13 @@ export default function AuthorRevisePage() {
     setError("");
     setLoading(true);
     try {
-      await manuscriptsApi.uploadRevision(Number(id), file);
-      router.push(`/author/${id}?revised=1`);
+      const res = await manuscriptsApi.uploadRevision(Number(id), file);
+      const parseJobId = Number(res.parse_job?.id);
+      const query = new URLSearchParams({ revised: "1" });
+      if (Number.isFinite(parseJobId) && parseJobId > 0) {
+        query.set("parseJobId", String(parseJobId));
+      }
+      router.push(`/author/${id}?${query.toString()}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "提交失败");
     } finally {
@@ -58,6 +71,7 @@ export default function AuthorRevisePage() {
     { title: <Link href={`/author/${id}`}>稿件详情</Link> },
     { title: "上传修订稿" },
   ];
+  const selectedFile = fileList[0];
 
   return (
     <div className="bg-white min-h-screen text-[#1d1d1f]">
@@ -77,16 +91,36 @@ export default function AuthorRevisePage() {
         <div className="bg-gray-50 border border-[#e5e7eb] rounded-sm p-8 max-w-2xl">
           <div className="mb-6">
             <Typography.Text strong className="block mb-3 text-gray-800">选择修订稿文件</Typography.Text>
-            <Upload
+            <Upload.Dragger
               maxCount={1}
               beforeUpload={() => false}
               accept=".docx,.doc,.pdf"
               fileList={fileList}
               onChange={normFile}
+              showUploadList={false}
+              rootClassName="submit-upload"
               className="w-full"
             >
-              <Button size="large" className="w-full">选择文件（.docx / .doc / .pdf）</Button>
-            </Upload>
+              <p className="ant-upload-drag-icon !mb-3">
+                <InboxOutlined className="text-[34px] text-[#8B1538]" />
+              </p>
+              <p className="ant-upload-text text-[16px] font-medium text-[#1f2937]">
+                点击或拖拽修订稿到此处上传
+              </p>
+              <p className="ant-upload-hint text-[13px] leading-6 text-[#667085]">
+                支持单个修订稿文件上传，仅接受 `.doc`、`.docx`、`.pdf` 格式。
+              </p>
+            </Upload.Dragger>
+          </div>
+
+          <div className="mb-6 bg-white p-5 rounded-sm border border-[#e5e7eb]">
+            <Descriptions size="small" column={{ xs: 1, md: 2 }} className="mb-0">
+              <Descriptions.Item label={<span className="text-gray-500">文件名</span>}>{selectedFile?.name || "未选择"}</Descriptions.Item>
+              <Descriptions.Item label={<span className="text-gray-500">文件大小</span>}>{formatBytes(selectedFile?.size)}</Descriptions.Item>
+              <Descriptions.Item label={<span className="text-gray-500">文件类型</span>}>
+                {selectedFile ? selectedFile.name.split(".").pop()?.toUpperCase() : "-"}
+              </Descriptions.Item>
+            </Descriptions>
           </div>
           
           {error && <Alert message={error} type="error" showIcon className="mb-6 rounded-sm" />}

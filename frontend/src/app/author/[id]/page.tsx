@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert, Breadcrumb, Button, Descriptions, List, Space, Spin, Tag, Typography, Divider } from "antd";
 import type { BreadcrumbItemType } from "antd/es/breadcrumb/Breadcrumb";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
 import MarkdownRenderer from "@/components/ui/MarkdownRenderer";
 import { STATUS_MAP } from "@/lib/constants";
-import { manuscriptsApi } from "@/services/api";
+import { jobsApi, manuscriptsApi, type BackgroundJob } from "@/services/api";
 
 interface VersionItem {
   id: number;
@@ -29,6 +29,7 @@ export default function AuthorManuscriptDetailPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [revisedMessage, setRevisedMessage] = useState(false);
+  const [parseJob, setParseJob] = useState<BackgroundJob | null>(null);
 
   useEffect(() => {
     if (searchParams.get("revised") === "1") {
@@ -38,27 +39,63 @@ export default function AuthorManuscriptDetailPage() {
     }
   }, [searchParams]);
 
-  useEffect(() => {
+  const loadDetail = useCallback(async () => {
     if (!user || !id) return;
-    (async () => {
-      setLoadError(null);
-      try {
-        const [d, rev, ver] = await Promise.all([
-          manuscriptsApi.get(Number(id)),
-          manuscriptsApi.revisionRequests(Number(id)),
-          manuscriptsApi.versions(Number(id)),
-        ]);
-        setDetail(d as Record<string, unknown>);
-        setRevisions((rev as { items: { comment?: string; created_at?: string }[] }).items);
-        setVersions((ver as { items: VersionItem[] }).items);
-      } catch (e) {
-        setDetail(null);
-        setLoadError(e instanceof Error ? e.message : "加载失败，请刷新重试");
-      } finally {
-        setLoading(false);
-      }
-    })();
+    setLoadError(null);
+    try {
+      const [d, rev, ver] = await Promise.all([
+        manuscriptsApi.get(Number(id)),
+        manuscriptsApi.revisionRequests(Number(id)),
+        manuscriptsApi.versions(Number(id)),
+      ]);
+      setDetail(d as Record<string, unknown>);
+      setRevisions((rev as { items: { comment?: string; created_at?: string }[] }).items);
+      setVersions((ver as { items: VersionItem[] }).items);
+    } catch (e) {
+      setDetail(null);
+      setLoadError(e instanceof Error ? e.message : "加载失败，请刷新重试");
+    } finally {
+      setLoading(false);
+    }
   }, [user, id]);
+
+  useEffect(() => {
+    loadDetail();
+  }, [loadDetail]);
+
+  useEffect(() => {
+    const parseJobId = Number(searchParams.get("parseJobId"));
+    if (!user || !parseJobId || Number.isNaN(parseJobId)) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const poll = async () => {
+      try {
+        const job = await jobsApi.get(parseJobId);
+        if (cancelled) return;
+        setParseJob(job);
+        if (job.status === "succeeded") {
+          await loadDetail();
+          return;
+        }
+        if (job.status === "pending" || job.status === "running") {
+          timer = setTimeout(poll, 1500);
+        }
+      } catch {
+        if (!cancelled) {
+          timer = setTimeout(poll, 3000);
+        }
+      }
+    };
+
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [loadDetail, searchParams, user]);
 
   if (!user) {
     router.push("/login");
@@ -102,6 +139,18 @@ export default function AuthorManuscriptDetailPage() {
 
         {revisedMessage && (
           <Alert message="修订稿已提交成功" type="success" showIcon className="mb-6 rounded-sm" />
+        )}
+        {searchParams.get("submitted") === "1" && (
+          <Alert message="稿件已提交，系统正在后台解析正文与脚注。" type="info" showIcon className="mb-6 rounded-sm" />
+        )}
+        {parseJob && (parseJob.status === "pending" || parseJob.status === "running") && (
+          <Alert message="后台解析进行中，完成后本页会自动刷新。" type="info" showIcon className="mb-6 rounded-sm" />
+        )}
+        {parseJob?.status === "failed" && (
+          <Alert message={parseJob.error || "后台解析失败，请稍后重试或联系编辑部。"} type="warning" showIcon className="mb-6 rounded-sm" />
+        )}
+        {parseJob?.status === "succeeded" && (
+          <Alert message="后台解析已完成。" type="success" showIcon className="mb-6 rounded-sm" />
         )}
         
         {loading && (

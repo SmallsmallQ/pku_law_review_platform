@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Col, Descriptions, Empty, List, Row, Space, Spin, Statistic, Table, Tag, Typography, Divider } from "antd";
+import { Button, Card, Descriptions, Empty, Space, Spin, Statistic, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
   adminApi,
@@ -274,52 +274,48 @@ export default function AdminDashboardPage() {
               统一查看稿件积压、用户结构、栏目配置和最近处理记录。保留现有业务逻辑，后台首页同样回归无卡片的扁平化结构。
             </Paragraph>
           </div>
-          <div className="bg-gray-50 border border-[#e5e7eb] rounded-sm p-4 text-sm flex gap-6 shrink-0 shadow-sm">
-             <div className="space-y-3 pr-6 border-r border-gray-200">
-                <div className="flex justify-between gap-4"><span className="text-gray-500">待处理稿件:</span><span className="font-medium">{stats.manuscripts_pending} 篇</span></div>
-                <div className="flex justify-between gap-4"><span className="text-gray-500">系统总用户:</span><span className="font-medium">{totalUsers} 人</span></div>
-             </div>
-             <div className="space-y-3">
-                <div className="flex justify-between gap-4"><span className="text-gray-500">栏目配置数:</span><span className="font-medium">{stats.sections_count} 个</span></div>
-                <div className="flex justify-between gap-4"><span className="text-gray-500">退修模板数:</span><span className="font-medium">{stats.templates_count} 个</span></div>
-             </div>
-             <div className="flex flex-col justify-end gap-2 ml-4 border-l border-gray-200 pl-6">
-               <Link href="/admin/manuscripts">
-                 <Button type="primary" size="small" className="w-full bg-[#8B1538] hover:!bg-[#A51D45] border-none shadow-sm rounded-sm">稿件总览</Button>
-               </Link>
-               <Button size="small" className="w-full rounded-sm" onClick={load}>刷新数据</Button>
-             </div>
-          </div>
+          <Card className="shrink-0" styles={{ body: { padding: 16 } }}>
+            <Descriptions column={2} size="small" className="mb-0">
+              <Descriptions.Item label="待处理稿件">{stats.manuscripts_pending} 篇</Descriptions.Item>
+              <Descriptions.Item label="系统总用户">{totalUsers} 人</Descriptions.Item>
+              <Descriptions.Item label="栏目配置数">{stats.sections_count} 个</Descriptions.Item>
+              <Descriptions.Item label="退修模板数">{stats.templates_count} 个</Descriptions.Item>
+            </Descriptions>
+            <Space className="mt-4">
+              <Link href="/admin/manuscripts">
+                <Button type="primary" size="small" className="bg-[#8B1538] hover:!bg-[#A51D45] border-none shadow-sm">稿件总览</Button>
+              </Link>
+              <Button size="small" onClick={load}>刷新数据</Button>
+            </Space>
+          </Card>
         </div>
       </section>
 
       {/* Statistics Section */}
       <section>
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-            <div className="bg-gray-50 border border-[#e5e7eb] p-5 rounded-sm shadow-sm flex flex-col justify-center">
+            <Card size="small" styles={{ body: { padding: 20 } }}>
               <Statistic title={<span className="text-gray-500 text-sm mb-1 block">全站稿件总数</span>} value={stats.manuscripts_total} valueStyle={{ fontSize: '28px', fontWeight: 600, color: '#111827' }} />
-            </div>
-            <div className="bg-red-50 border border-red-100 p-5 rounded-sm shadow-sm flex flex-col justify-center relative overflow-hidden">
-               <div className="absolute -right-4 -top-4 w-16 h-16 bg-red-100 rounded-full opacity-50"></div>
+            </Card>
+            <Card size="small" className="border-red-100 bg-red-50" styles={{ body: { padding: 20 } }}>
               <Statistic title={<span className="text-red-800/70 text-sm mb-1 block font-medium">积压待办稿件</span>} value={stats.manuscripts_pending} valueStyle={{ fontSize: '28px', fontWeight: 600, color: '#8B1538' }} />
-            </div>
-            <div className="bg-gray-50 border border-[#e5e7eb] p-5 rounded-sm shadow-sm flex flex-col justify-center">
+            </Card>
+            <Card size="small" styles={{ body: { padding: 20 } }}>
               <Statistic title={<span className="text-gray-500 text-sm mb-1 block">收录总栏目数</span>} value={stats.sections_count} valueStyle={{ fontSize: '28px', fontWeight: 600, color: '#111827' }} />
-            </div>
-            <div className="bg-gray-50 border border-[#e5e7eb] p-5 rounded-sm shadow-sm flex flex-col justify-center">
+            </Card>
+            <Card size="small" styles={{ body: { padding: 20 } }}>
               <Statistic title={<span className="text-gray-500 text-sm mb-1 block">预设退修模板</span>} value={stats.templates_count} valueStyle={{ fontSize: '28px', fontWeight: 600, color: '#111827' }} />
-            </div>
-            <div className="bg-gray-50 border border-[#e5e7eb] p-5 rounded-sm shadow-sm flex flex-col justify-center">
+            </Card>
+            <Card size="small" styles={{ body: { padding: 20 } }}>
               <Statistic title={<span className="text-gray-500 text-sm mb-1 block">作者基数</span>} value={stats.users_by_role?.author ?? 0} valueStyle={{ fontSize: '28px', fontWeight: 600, color: '#111827' }} />
-            </div>
-            <div className="bg-blue-50 border border-blue-100 p-5 rounded-sm shadow-sm flex flex-col justify-center relative overflow-hidden">
-               <div className="absolute -right-4 -top-4 w-16 h-16 bg-blue-100 rounded-full opacity-50"></div>
+            </Card>
+            <Card size="small" className="border-blue-100 bg-blue-50" styles={{ body: { padding: 20 } }}>
               <Statistic 
                 title={<span className="text-blue-800/70 text-sm mb-1 block font-medium">编辑专家梯队</span>} 
                 value={(stats.users_by_role?.internal_reviewer ?? 0) + (stats.users_by_role?.external_reviewer ?? 0) + (stats.users_by_role?.editor ?? 0)} 
                 valueStyle={{ fontSize: '28px', fontWeight: 600, color: '#1d4ed8' }} 
               />
-            </div>
+            </Card>
         </div>
       </section>
 

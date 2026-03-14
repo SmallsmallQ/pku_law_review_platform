@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 生产环境一键启动：仅启动后端（uvicorn 多 worker）+ 前端（next start）。
+# 生产环境一键启动：启动后端（uvicorn 多 worker）+ 后台 worker + 前端（next start）。
 # 不包含 Nginx、systemd、HTTPS；部署到服务器后建议用 systemd 管理进程，见 docs/deploy.md。
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -38,24 +38,30 @@ cleanup_port() {
 cleanup_port 8000 "后端"
 cleanup_port 3000 "前端"
 
-# 启动后端（多 worker，无 --reload）
+# 执行迁移并启动后端（多 worker，无 --reload）
 cd "$ROOT/backend"
 if [ -d venv ]; then
   source venv/bin/activate
 fi
+alembic upgrade head
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 &
 BACKEND_PID=$!
+python -m scripts.job_worker &
+WORKER_PID=$!
 cd "$ROOT"
 echo "[OK] 后端已启动 (PID $BACKEND_PID)，http://0.0.0.0:8000"
+echo "[OK] 后台任务 worker 已启动 (PID $WORKER_PID)"
 
-cleanup_backend() {
+cleanup_processes() {
+  kill "$WORKER_PID" 2>/dev/null || true
+  pkill -P "$WORKER_PID" 2>/dev/null || true
   kill "$BACKEND_PID" 2>/dev/null || true
   pkill -P "$BACKEND_PID" 2>/dev/null || true
-  echo "已停止后端"
+  echo "已停止后端与 worker"
 }
 
-trap "cleanup_backend; exit" INT TERM
-trap "cleanup_backend" EXIT
+trap "cleanup_processes; exit" INT TERM
+trap "cleanup_processes" EXIT
 
 # 启动前端（生产模式）
 export NODE_ENV=production

@@ -38,6 +38,22 @@ export interface LoginRes {
   token_type: string;
 }
 
+export interface BackgroundJob<T = Record<string, unknown>> {
+  id: number;
+  job_type: string;
+  status: "pending" | "running" | "succeeded" | "failed";
+  payload: Record<string, unknown>;
+  result?: T | null;
+  error?: string | null;
+  attempts: number;
+  max_attempts: number;
+  manuscript_id?: number | null;
+  version_id?: number | null;
+  created_at: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit & { params?: Record<string, string> } = {}
@@ -115,6 +131,28 @@ async function requestWithTimeout<T>(
   }
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function waitForJob<T = Record<string, unknown>>(
+  jobId: number,
+  options: { intervalMs?: number; timeoutMs?: number } = {}
+): Promise<BackgroundJob<T>> {
+  const { intervalMs = 1500, timeoutMs = 120000 } = options;
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() <= deadline) {
+    const job = await jobsApi.get<T>(jobId);
+    if (job.status === "succeeded" || job.status === "failed") {
+      return job;
+    }
+    await sleep(intervalMs);
+  }
+
+  throw new Error("任务处理超时，请稍后刷新查看结果");
+}
+
 export const authApi = {
   register: (body: { email: string; password: string; real_name?: string; institution?: string }) =>
     request<User>("auth/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
@@ -163,7 +201,7 @@ export const manuscriptsApi = {
     }),
   get: (id: number) => request<Record<string, unknown>>(`manuscripts/${id}`),
   create: (formData: FormData) =>
-    request<{ manuscript: Record<string, unknown>; version: Record<string, unknown> }>("manuscripts", {
+    request<{ manuscript: Record<string, unknown>; version: Record<string, unknown>; parse_job?: BackgroundJob | null }>("manuscripts", {
       method: "POST",
       body: formData,
       headers: {}, // 不设 Content-Type，让浏览器带 multipart boundary
@@ -173,7 +211,7 @@ export const manuscriptsApi = {
   uploadRevision: (id: number, file: File) => {
     const fd = new FormData();
     fd.append("file", file);
-    return request<Record<string, unknown>>(`manuscripts/${id}/versions`, { method: "POST", body: fd });
+    return request<{ version: Record<string, unknown>; parse_job?: BackgroundJob | null }>(`manuscripts/${id}/versions`, { method: "POST", body: fd });
   },
   downloadUrl: (id: number, versionId: number) =>
     `${API_BASE}/manuscripts/${id}/files/${versionId}/download${getToken() ? `?token=${getToken()}` : ""}`,
@@ -301,9 +339,13 @@ export const editorApi = {
   /** Word 转 PDF 预览：返回 PDF 文件流，仅对 .docx/.doc 有效；PDF 原稿请用 download */
   previewPdfUrl: (id: number, versionId: number) =>
     `${API_BASE}/editor/manuscripts/${id}/files/${versionId}/preview-pdf${getToken() ? `?token=${getToken()}` : ""}`,
+  enqueuePreviewPdfJob: (id: number, versionId: number) =>
+    request<{ job: BackgroundJob<{ preview_path?: string }> }>(`editor/manuscripts/${id}/files/${versionId}/preview-pdf/jobs`, { method: "POST" }),
   /** 生成 AI 初审报告 */
   generateAiReview: (id: number) =>
     request<{ content: string; model: string }>(`editor/manuscripts/${id}/ai-review`, { method: "POST" }),
+  enqueueAiReviewJob: (id: number) =>
+    request<{ job: BackgroundJob<{ report_id?: number; model?: string }> }>(`editor/manuscripts/${id}/ai-review/jobs`, { method: "POST" }),
   /** 基于当前稿件的 AI 对话（后端注入上下文） */
   aiChat: (id: number, message: string) =>
     request<{ content: string; model: string }>(`editor/manuscripts/${id}/ai-chat`, {
@@ -314,12 +356,18 @@ export const editorApi = {
   /** 生成退修意见草稿（基于初审报告与退修模板），约 60s 内返回，前端等待最多 120s */
   revisionDraft: (id: number) =>
     requestWithTimeout<{ draft: string }>(`editor/manuscripts/${id}/revision-draft`, { method: "POST", timeoutMs: 120000 }),
+  enqueueRevisionDraftJob: (id: number) =>
+    request<{ job: BackgroundJob<{ draft?: string }> }>(`editor/manuscripts/${id}/revision-draft/jobs`, { method: "POST" }),
   /** 引注自动检查（当前版本脚注），返回问题列表并写入报告；use_llm 为 true 时接入大模型辅助判断 */
   runCitationCheck: (id: number, options?: { use_llm?: boolean }) =>
     request<{ total: number; issues: { location: string; issue_type: string; description: string; suggestion?: string; severity?: string }[] }>(
       `editor/manuscripts/${id}/citation-check`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ use_llm: options?.use_llm ?? false }) }
     ),
+};
+
+export const jobsApi = {
+  get: <T = Record<string, unknown>>(jobId: number) => request<BackgroundJob<T>>(`jobs/${jobId}`),
 };
 
 /** 阿里云百炼大模型：仅编辑可用 */

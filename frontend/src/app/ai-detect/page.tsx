@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button, Divider, Input, message, Select, Spin, Typography, Upload } from "antd";
-import { CopyOutlined, FileWordOutlined, LinkOutlined } from "@ant-design/icons";
+import { CopyOutlined, InboxOutlined, LinkOutlined } from "@ant-design/icons";
 import HeaderBar from "@/components/HeaderBar";
 import { useAuth } from "@/contexts/AuthContext";
 import { manuscriptsApi, type AccessibleManuscriptListItem } from "@/services/api";
@@ -181,16 +181,18 @@ export default function AIDetectPage() {
                 fileList={[]}
                 beforeUpload={(file) => handleUploadFile(file)}
                 showUploadList={false}
-                rootClassName="ai-detect-upload"
+                rootClassName="submit-upload"
               >
-                <div className="ai-detect-upload-panel">
-                  <p className="ant-upload-drag-icon mb-2">
-                    <FileWordOutlined className="text-2xl text-gray-400" />
-                  </p>
-                  <p className="ant-upload-text mb-1 text-sm font-medium text-gray-600">点击或拖拽文件到此处</p>
-                  <p className="ant-upload-hint text-xs text-gray-400">支持 .docx / .pdf</p>
-                  {loadingExtract && <Spin className="mt-3" size="small" />}
-                </div>
+                <p className="ant-upload-drag-icon !mb-3">
+                  <InboxOutlined className="text-[34px] text-[#8B1538]" />
+                </p>
+                <p className="ant-upload-text text-[16px] font-medium text-[#1f2937]">
+                  点击或拖拽文件到此处解析
+                </p>
+                <p className="ant-upload-hint text-[13px] leading-6 text-[#667085]">
+                  支持单个 Word 或 PDF 文件，系统会自动提取正文内容并填入下方文本框，不保存原始文件。
+                </p>
+                {loadingExtract && <Spin className="mt-3" size="small" />}
               </Upload.Dragger>
             </div>
           </div>

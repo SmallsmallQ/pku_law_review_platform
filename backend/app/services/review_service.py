@@ -1,6 +1,10 @@
+import logging
 from datetime import datetime
 from typing import Optional
+
 from sqlalchemy.orm import Session
+
+from app.db.base import SessionLocal
 from app.models import Manuscript, ManuscriptVersion, ManuscriptParsed, ReviewReport
 from app.services.parser import parse_manuscript
 from app.services.llm import chat_completion, is_llm_configured
@@ -10,6 +14,7 @@ from app.config import settings
 MAX_BODY_CHARS_FOR_REVIEW = 50000
 MAX_FOOTNOTES_CHARS_FOR_REVIEW = 12000
 MAX_HEADINGS_FOR_REVIEW = 80
+logger = logging.getLogger(__name__)
 
 
 def _clip_text_for_review(text: str, max_chars: int) -> tuple[str, bool]:
@@ -64,6 +69,24 @@ def process_manuscript_parsing(db: Session, version_id: int):
         db.rollback()
         return None
     return parsed_obj
+
+
+def process_manuscript_parsing_job(version_id: int):
+    """
+    后台任务入口：自行创建/关闭 Session，避免把请求级 Session 传给后台任务。
+    """
+    db = SessionLocal()
+    try:
+        return process_manuscript_parsing(db, version_id)
+    except Exception:
+        logger.exception("后台解析稿件失败 version_id=%s", version_id)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return None
+    finally:
+        db.close()
 
 def generate_full_ai_report(db: Session, manuscript_id: int, version_id: int) -> Optional[ReviewReport]:
     """生成完整的 AI 初审报告。"""

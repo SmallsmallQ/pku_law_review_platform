@@ -7,27 +7,56 @@ import {
   Alert,
   Button,
   Descriptions,
+  Divider,
   Empty,
   Input,
   List,
   Select,
-  Space,
   Spin,
+  Steps,
   Tag,
   Timeline,
   Typography,
   message,
-  Divider,
 } from "antd";
 import { useAuth } from "@/contexts/AuthContext";
 import HeaderBar from "@/components/HeaderBar";
 import MarkdownRenderer from "@/components/ui/MarkdownRenderer";
 import TypewriterMarkdown from "@/components/ui/TypewriterMarkdown";
 import { REVIEW_STAGE_MAP, REVIEW_STAFF_ROLES, ROLE_MAP, STATUS_MAP } from "@/lib/constants";
-import { editorApi, type EditorManuscriptDetail, type EditorManuscriptItem } from "@/services/api";
+import { editorApi, waitForJob, type EditorManuscriptDetail, type EditorManuscriptItem } from "@/services/api";
 
 const { TextArea } = Input;
-const { Paragraph, Text, Title } = Typography;
+const { Paragraph, Title } = Typography;
+
+const FLOW_STEP_INDEX: Record<string, number> = {
+  submitted: 0,
+  parsing: 0,
+  under_review: 0,
+  internal_review: 1,
+  external_review: 2,
+  final_review: 3,
+  revision_requested: 3,
+  revised_submitted: 3,
+  final_submitted: 4,
+  accepted: 4,
+  rejected: 4,
+};
+
+const STAGE_TO_STEP_INDEX: Record<string, number> = {
+  internal: 1,
+  external: 2,
+  final: 3,
+};
+
+const ACTION_LABEL_MAP: Record<string, string> = {
+  revision_request: "发起退修",
+  reject: "退稿",
+  submit_internal_review: "提交内审结论",
+  submit_external_review: "提交外审结论",
+  submit_final_submission: "提交终审结论",
+  accept: "正式录用",
+};
 
 export default function EditorWorkbenchPage() {
   const { user, loading: authLoading } = useAuth();
@@ -40,7 +69,6 @@ export default function EditorWorkbenchPage() {
   const [detail, setDetail] = useState<EditorManuscriptDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [revisionComment, setRevisionComment] = useState("");
-  const [actionLoading, setActionLoading] = useState(false);
   const [aiReviewLoading, setAiReviewLoading] = useState(false);
   const [aiReport, setAiReport] = useState<{ content: string; model: string } | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -48,6 +76,7 @@ export default function EditorWorkbenchPage() {
   const [typewriterForReportId, setTypewriterForReportId] = useState<number | null>(null);
   const [revisionDraftLoading, setRevisionDraftLoading] = useState(false);
   const [revisionDraftError, setRevisionDraftError] = useState<string | null>(null);
+  const [jobMessage, setJobMessage] = useState<string | null>(null);
 
   const isReviewStaff = !!user?.role && REVIEW_STAFF_ROLES.includes(user.role as (typeof REVIEW_STAFF_ROLES)[number]);
   const loadList = useCallback(async () => {
@@ -107,41 +136,34 @@ export default function EditorWorkbenchPage() {
   }, [selectedId]);
 
   useEffect(() => {
+    if (!jobMessage) return;
+    const timer = setTimeout(() => setJobMessage(null), 4000);
+    return () => clearTimeout(timer);
+  }, [jobMessage]);
+
+  useEffect(() => {
     if (!selectedId) return;
     loadDetail(selectedId);
   }, [selectedId, loadDetail]);
-
-  const runAction = async (actionType: string) => {
-    if (!selectedId) return;
-    setActionLoading(true);
-    try {
-      await editorApi.action(selectedId, {
-        action_type: actionType,
-        comment: actionType === "revision_request" ? (revisionComment.trim() || undefined) : undefined,
-      });
-      message.success("操作成功");
-      if (actionType === "revision_request") setRevisionComment("");
-      await loadList();
-      await loadDetail(selectedId);
-    } catch (e) {
-      message.error(e instanceof Error ? e.message : "操作失败");
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   const runAiReview = async () => {
     if (!selectedId) return;
     setAiReviewLoading(true);
     setAiError(null);
     try {
-      const res = await editorApi.generateAiReview(selectedId);
-      setAiReport(res);
+      setJobMessage("已提交 AI 初审任务，正在生成报告…");
+      const enqueueRes = await editorApi.enqueueAiReviewJob(selectedId);
+      const job = await waitForJob<{ report_id?: number; model?: string }>(enqueueRes.job.id, { timeoutMs: 180000 });
+      if (job.status !== "succeeded") {
+        throw new Error(job.error || "AI 初审任务执行失败");
+      }
       setTypewriterForReportId(selectedId);
-      message.success("AI 初审报告已生成");
       await loadDetail(selectedId);
+      message.success("AI 初审报告已生成");
+      setJobMessage("AI 初审报告已生成");
     } catch (e) {
       setAiError(e instanceof Error ? e.message : "生成失败");
+      setJobMessage(null);
     } finally {
       setAiReviewLoading(false);
     }
@@ -152,11 +174,18 @@ export default function EditorWorkbenchPage() {
     setRevisionDraftError(null);
     setRevisionDraftLoading(true);
     try {
-      const res = await editorApi.revisionDraft(selectedId);
-      setRevisionComment(res.draft);
+      setJobMessage("已提交退修意见草稿任务，正在生成…");
+      const enqueueRes = await editorApi.enqueueRevisionDraftJob(selectedId);
+      const job = await waitForJob<{ draft?: string }>(enqueueRes.job.id, { timeoutMs: 180000 });
+      if (job.status !== "succeeded") {
+        throw new Error(job.error || "退修意见草稿生成失败");
+      }
+      setRevisionComment(String(job.result?.draft || ""));
       message.success("已填入退修意见草稿，可修改后提交");
+      setJobMessage("退修意见草稿已生成");
     } catch (e) {
       setRevisionDraftError(e instanceof Error ? e.message : "生成失败");
+      setJobMessage(null);
     } finally {
       setRevisionDraftLoading(false);
     }
@@ -173,6 +202,51 @@ export default function EditorWorkbenchPage() {
   const currentStage = manuscript?.current_review_stage as string | undefined;
   const availableActions = detail?.available_actions ?? [];
   const assignments = detail?.assignments ?? [];
+  const flowCurrentIndex = currentStage ? STAGE_TO_STEP_INDEX[currentStage] ?? (FLOW_STEP_INDEX[status ?? ""] ?? 0) : (FLOW_STEP_INDEX[status ?? ""] ?? 0);
+  const progressItems = [
+    {
+      title: "投稿入库",
+      subTitle: "作者提交",
+      status: flowCurrentIndex > 0 ? "finish" : "process",
+    },
+    {
+      title: "内审",
+      subTitle: currentStage === "internal" ? "当前阶段" : "阶段一",
+      status: currentStage === "internal" ? (status === "revision_requested" ? "error" : "process") : flowCurrentIndex > 1 ? "finish" : "wait",
+    },
+    {
+      title: "外审",
+      subTitle: currentStage === "external" ? "当前阶段" : "阶段二",
+      status: currentStage === "external" ? (status === "revision_requested" ? "error" : "process") : flowCurrentIndex > 2 ? "finish" : "wait",
+    },
+    {
+      title: "终审",
+      subTitle: currentStage === "final" ? "当前阶段" : "阶段三",
+      status: currentStage === "final" ? (status === "revision_requested" ? "error" : "process") : flowCurrentIndex > 3 ? "finish" : "wait",
+    },
+    {
+      title: "结果归档",
+      subTitle:
+        status === "accepted"
+          ? "已录用"
+          : status === "final_submitted"
+            ? "已提交成稿"
+            : status === "rejected"
+              ? "已退稿"
+              : status === "revised_submitted"
+                ? "修订稿已回传"
+                : "待完成",
+      status:
+        status === "rejected"
+          ? "error"
+          : ["accepted", "final_submitted"].includes(status ?? "")
+            ? "finish"
+            : status === "revised_submitted"
+              ? "process"
+              : "wait",
+    },
+  ] as const;
+  const availableActionLabels = availableActions.map((action) => ACTION_LABEL_MAP[action] ?? action);
 
   const timelineItems = useMemo(
     () =>
@@ -301,21 +375,21 @@ export default function EditorWorkbenchPage() {
                      </Link>
                   </div>
 
-                  <div className="bg-gray-50 border border-gray-200 p-5 rounded-sm mb-6 shrink-0">
+                  <div className="mb-6 shrink-0 border-b border-[#e5e7eb] pb-5">
                     <div className="flex items-center gap-2 mb-2">
-                       <span className="text-xs font-mono text-gray-500 bg-white px-2 py-0.5 border rounded-sm">{String(manuscript?.manuscript_no ?? "")}</span>
+                       <span className="text-xs font-mono text-gray-500">{String(manuscript?.manuscript_no ?? "")}</span>
                     </div>
                     <div className="font-medium text-lg text-gray-900 leading-snug">{String(manuscript?.title ?? "—")}</div>
                     
-                    <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-2">
+                    <div className="mt-4 flex flex-wrap gap-2">
                       {currentStage && (
-                         <div className="bg-[#8B1538] text-white text-xs px-2.5 py-1 rounded-sm shadow-sm inline-flex items-center">
+                         <div className="text-[#8B1538] text-xs inline-flex items-center">
                             当前阶段：{REVIEW_STAGE_MAP[currentStage] ?? currentStage}
                          </div>
                       )}
                       
                       {assignments.map((item) => (
-                        <div key={item.id} className="bg-white border border-gray-200 text-gray-700 text-xs px-2.5 py-1 rounded-sm flex items-center gap-1.5 shadow-sm">
+                        <div key={item.id} className="text-gray-600 text-xs flex items-center gap-1.5">
                           <span className="text-gray-400">•</span>
                           <span className="font-medium">{REVIEW_STAGE_MAP[item.review_stage] ?? item.review_stage}</span> 
                           <span>执行人: {item.reviewer_name}</span>
@@ -328,14 +402,14 @@ export default function EditorWorkbenchPage() {
                     <div className="mb-6 shrink-0">
                       <div className="flex items-center justify-between mb-2">
                          <span className="text-sm font-medium text-gray-800">拟定退修意见</span>
-                         <Button
+                        <Button
                           type="default"
                           size="small"
                           className="text-[#8B1538] border-[#8B1538] hover:!bg-red-50 hover:!text-[#A51D45] hover:!border-[#A51D45] rounded-sm bg-white"
                           onClick={runRevisionDraft}
                           loading={revisionDraftLoading}
                         >
-                          {revisionDraftLoading ? "智写生成中..." : "✧ AI 智能草拟退修意见"}
+                          {revisionDraftLoading ? "生成中..." : "AI 辅助生成退修意见"}
                         </Button>
                       </div>
                       {revisionDraftError && (
@@ -345,45 +419,31 @@ export default function EditorWorkbenchPage() {
                         rows={6}
                         value={revisionComment}
                         onChange={(e) => setRevisionComment(e.target.value)}
-                        placeholder="在此撰写需要作者修改的具体意见，支持 Markdown。点击下方「发出退修要求」时将下达给作者..."
+                        placeholder="在此填写需要作者修改的具体意见。点击下方发起退修后，系统将把意见发送给作者。"
                         className="!rounded-sm !font-sans !bg-gray-50 focus:!bg-white resize-y"
                       />
                     </div>
                   )}
 
-                  <div className="mb-8 p-4 border border-blue-100 bg-blue-50/50 rounded-sm shrink-0">
-                    <div className="text-xs font-medium text-blue-800 mb-3 uppercase tracking-wider">可用流程动作</div>
-                    <div className="flex flex-wrap gap-3">
-                      {availableActions.includes("revision_request") && (
-                        <Button onClick={() => runAction("revision_request")} loading={actionLoading} className="rounded-sm border-orange-300 text-orange-600 hover:!text-orange-700 hover:!border-orange-400 bg-white shadow-sm font-medium">
-                          发出退修要求
-                        </Button>
-                      )}
-                      {availableActions.includes("reject") && (
-                        <Button danger onClick={() => runAction("reject")} loading={actionLoading} className="rounded-sm shadow-sm font-medium">
-                          直接驳回退稿
-                        </Button>
-                      )}
-                      {availableActions.includes("submit_internal_review") && (
-                        <Button type="primary" onClick={() => runAction("submit_internal_review")} loading={actionLoading} className="rounded-sm bg-blue-600 hover:!bg-blue-700 shadow-sm font-medium border-none">
-                          转入内部初审
-                        </Button>
-                      )}
-                      {availableActions.includes("submit_external_review") && (
-                        <Button type="primary" onClick={() => runAction("submit_external_review")} loading={actionLoading} className="rounded-sm bg-indigo-600 hover:!bg-indigo-700 shadow-sm font-medium border-none">
-                          提交专家外审
-                        </Button>
-                      )}
-                      {availableActions.includes("submit_final_submission") && (
-                        <Button type="primary" onClick={() => runAction("submit_final_submission")} loading={actionLoading} className="rounded-sm bg-purple-600 hover:!bg-purple-700 shadow-sm font-medium border-none">
-                          确认稿件成稿
-                        </Button>
-                      )}
-                      {availableActions.includes("accept") && (
-                        <Button type="primary" onClick={() => runAction("accept")} loading={actionLoading} className="rounded-sm bg-emerald-600 hover:!bg-emerald-700 shadow-sm font-medium border-none">
-                          正式通过录用
-                        </Button>
-                      )}
+                  <div className="mb-8 shrink-0 border-b border-[#e5e7eb] pb-6">
+                    <div className="flex items-center justify-between gap-4 mb-4">
+                      <div className="text-sm font-medium text-gray-900">稿件流程进度</div>
+                      <Tag bordered={false} className="!m-0 bg-transparent px-0 text-[#1d4ed8]">
+                        {STATUS_MAP[status ?? ""] ?? status ?? "—"}
+                        {currentStage ? ` · ${REVIEW_STAGE_MAP[currentStage] ?? currentStage}` : ""}
+                      </Tag>
+                    </div>
+                    <Steps
+                      current={flowCurrentIndex}
+                      size="small"
+                      variant="outlined"
+                      responsive
+                      items={progressItems}
+                    />
+                    <div className="mt-4 text-xs text-[#667085] leading-6">
+                      {availableActionLabels.length > 0
+                        ? `当前节点可执行：${availableActionLabels.join("、")}`
+                        : "当前阶段暂无可直接执行的流程操作，请按审稿进度继续查看或进入详情页处理。"}
                     </div>
                   </div>
 
@@ -393,28 +453,29 @@ export default function EditorWorkbenchPage() {
                            <span className="text-[#8B1538]">✧</span> AI 初审分析报告
                         </Title>
                         <Button type="dashed" size="small" className="rounded-sm text-gray-600" onClick={runAiReview} loading={aiReviewLoading}>
-                          {aiReport ? '重新生成' : '开始智能首审'}
+                          {aiReport ? "重新生成" : "生成初审报告"}
                         </Button>
                      </div>
                      
-                     {aiError && <Alert type="error" showIcon message={aiError} className="mb-4 shrink-0 rounded-sm" />}
+                     {aiError && <Alert type="error" showIcon message={aiError} className="mb-4 shrink-0" />}
+                     {jobMessage && <Alert type="info" showIcon message={jobMessage} className="mb-4 shrink-0" />}
                      
                      {aiReport ? (
-                        <div className="flex-1 border border-[#e5e7eb] rounded-sm bg-white overflow-hidden flex flex-col shadow-sm">
-                           <div className="bg-gray-50 px-4 py-2 text-xs border-b border-[#e5e7eb] flex justify-between text-gray-500 font-mono items-center shrink-0">
-                              <span>GENERATED_REPORT</span>
-                              <span>Model: {aiReport.model || 'Unknown'}</span>
+                        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                           <div className="px-0 py-2 text-xs border-b border-[#e5e7eb] flex justify-between text-gray-500 items-center shrink-0">
+                              <span>AI 初审报告</span>
+                              <span>模型：{aiReport.model || "未知"}</span>
                            </div>
-                           <div className="p-5 overflow-y-auto flex-1 prose prose-sm prose-red max-w-none prose-p:text-gray-700">
+                           <div className="pt-5 overflow-y-auto flex-1 prose prose-sm prose-red max-w-none prose-p:text-gray-700">
                              <TypewriterMarkdown content={aiReport.content} enabled={typewriterForReportId === selectedId} />
                            </div>
                         </div>
                      ) : (
-                        <div className="flex-1 border border-dashed border-gray-300 rounded-sm bg-gray-50/50 flex flex-col items-center justify-center p-8 text-center">
+                        <div className="flex-1 flex flex-col items-center justify-center py-12 text-center">
                            <div className="w-12 h-12 rounded-full bg-red-50 text-[#8B1538] flex items-center justify-center text-xl mb-4">✧</div>
-                           <p className="text-gray-500 text-sm mb-4 max-w-xs">使用平台接入的AI大模型对文章的创新性、规范性和学术价值进行快速初筛分析。</p>
+                           <p className="text-gray-500 text-sm mb-4 max-w-xs">使用平台接入的大模型对文章的创新性、规范性和学术价值进行辅助分析，供编辑初筛参考。</p>
                            <Button type="primary" className="bg-[#8B1538] hover:!bg-[#A51D45] rounded-sm border-none shadow-sm" onClick={runAiReview} loading={aiReviewLoading}>
-                             一键生成 AI 初审
+                             生成 AI 初审报告
                            </Button>
                         </div>
                      )}
@@ -432,76 +493,70 @@ export default function EditorWorkbenchPage() {
                   <Spin />
                 </div>
               ) : (
-                <div className="space-y-8">
-                  <div>
-                    <Title level={5} className="!mb-4 !font-medium text-gray-900">核心元信息</Title>
-                    <div className="border border-[#e5e7eb] rounded-sm overflow-hidden bg-white shadow-sm">
-                      <table className="w-full text-sm text-left">
-                        <tbody className="divide-y divide-[#e5e7eb]">
-                          <tr>
-                            <th className="py-2.5 px-4 bg-gray-50 text-gray-500 font-medium w-24">当前状态</th>
-                            <td className="py-2.5 px-4"><Tag className="!m-0 rounded-sm border-gray-200">{STATUS_MAP[status ?? ""] ?? status}</Tag></td>
-                          </tr>
-                          <tr>
-                            <th className="py-2.5 px-4 bg-gray-50 text-gray-500 font-medium whitespace-nowrap">投稿主账号</th>
-                            <td className="py-2.5 px-4 truncate text-gray-800">{String(manuscript?.submitted_by ?? "—")}</td>
-                          </tr>
-                          <tr>
-                            <th className="py-2.5 px-4 bg-gray-50 text-gray-500 font-medium align-top">各审稿分配</th>
-                            <td className="py-2.5 px-4 text-gray-800 leading-relaxed">
-                              {assignments.length > 0 ? (
-                                <ul className="list-disc pl-4 space-y-1 m-0 break-words pr-2">
-                                  {assignments.map((item, idx) => (
-                                    <li key={idx} className="marker:text-gray-300 relative text-gray-700">
-                                      {REVIEW_STAGE_MAP[item.review_stage] ?? item.review_stage}: <span className="font-medium whitespace-nowrap">{item.reviewer_name}</span>
-                                      {item.reviewer_role && <span className="text-gray-500 text-xs ml-1 block mt-0.5">({ROLE_MAP[item.reviewer_role] ?? item.reviewer_role})</span>}
-                                    </li>
-                                  ))}
-                                </ul>
-                              ) : "暂未向任何专家或责编分派"}
-                            </td>
-                          </tr>
-                          <tr>
-                            <th className="py-3 px-4 bg-gray-50 text-gray-500 font-medium align-top w-24 whitespace-nowrap">最新正文稿</th>
-                            <td className="py-3 px-4 text-gray-800 break-words pr-2">
-                              {currentVersion ? (
-                                <div className="space-y-1">
-                                  <div className="text-xs font-mono bg-gray-100 p-1 px-1.5 rounded inline-block w-fit mr-1.5">v{String(currentVersion.version_number)}</div>
-                                  <span className="break-words leading-tight block">{String(currentVersion.file_name_original ?? "文件")}</span>
-                                  <a href={editorApi.downloadUrl(selectedId, Number(currentVersion.id))} target="_blank" rel="noopener noreferrer" className="text-[#8B1538] hover:underline hover:text-[#A51D45] text-xs font-medium inline-block mt-1 bg-red-50 px-2 py-0.5 rounded border border-red-100">
-                                    直达安全下载
-                                  </a>
+	                <div>
+	                  <div>
+	                    <Title level={5} className="!mb-4 !font-medium text-gray-900">核心元信息</Title>
+                      <Descriptions
+                        column={1}
+                        size="small"
+                        className="mb-0"
+                        styles={{
+                          label: { width: 96, color: "#667085" },
+                          content: { color: "#1f2937" },
+                        }}
+                      >
+                        <Descriptions.Item label="当前状态">
+                          <Tag className="!m-0 border-gray-200">{STATUS_MAP[status ?? ""] ?? status}</Tag>
+                        </Descriptions.Item>
+                        <Descriptions.Item label="投稿主账号">{String(manuscript?.submitted_by ?? "—")}</Descriptions.Item>
+                        <Descriptions.Item label="各审稿分配">
+                          {assignments.length > 0 ? (
+                            <div className="space-y-1">
+                              {assignments.map((item, idx) => (
+                                <div key={idx} className="text-sm text-gray-700">
+                                  {REVIEW_STAGE_MAP[item.review_stage] ?? item.review_stage}：<span className="font-medium">{item.reviewer_name}</span>
+                                  {item.reviewer_role ? <span className="text-xs text-gray-500 ml-1">({ROLE_MAP[item.reviewer_role] ?? item.reviewer_role})</span> : null}
                                 </div>
-                              ) : (
-                                "—"
-                              )}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                              ))}
+                            </div>
+                          ) : "暂未向任何专家或责编分派"}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="最新正文稿">
+                          {currentVersion ? (
+                            <div className="space-y-1">
+                              <div className="text-xs text-gray-500">v{String(currentVersion.version_number)}</div>
+                              <div className="break-words">{String(currentVersion.file_name_original ?? "文件")}</div>
+                              <a href={editorApi.downloadUrl(selectedId, Number(currentVersion.id))} target="_blank" rel="noopener noreferrer" className="text-[#8B1538] hover:underline text-xs font-medium inline-block mt-1">
+                                直达安全下载
+                              </a>
+                            </div>
+                          ) : "—"}
+                        </Descriptions.Item>
+                      </Descriptions>
+	                  </div>
 
-                  <div>
-                     <Title level={5} className="!mb-4 !font-medium text-gray-900 border-t border-[#e5e7eb] pt-6">智能解析摘要</Title>
-                     <p className="text-sm text-gray-600 leading-relaxed bg-blue-50/30 p-4 border border-blue-100 rounded-sm">
-                       {String(parsed?.abstract || "文档尚未成功解析，或无法在稿件内定位到摘要词条。")}
-                     </p>
-                  </div>
-                  
-                  <div>
-                     <Title level={5} className="!mb-4 !font-medium text-gray-900 border-t border-[#e5e7eb] pt-6 flex items-center gap-2">系统流转时间线</Title>
-                     {timelineItems.length > 0 ? (
-                       <div className="bg-gray-50 p-5 rounded-sm border border-gray-200 shadow-inner">
-                         <Timeline items={timelineItems} className="pt-2 pl-1 [&_.ant-timeline-item-content]:ml-6" />
-                       </div>
-                     ) : (
-                       <Empty description="暂无操作记录流转" className="border border-dashed border-gray-200 py-8 rounded-sm bg-gray-50/50" />
-                     )}
-                  </div>
-                </div>
-              )}
-          </section>
+                    <Divider className="!my-6" />
+
+	                  <div>
+	                     <Title level={5} className="!mb-4 !font-medium text-gray-900">智能解析摘要</Title>
+                       <Paragraph className="!mb-0 !text-sm !leading-7 !text-gray-600">
+	                       {String(parsed?.abstract || "文档尚未成功解析，或无法在稿件内定位到摘要词条。")}
+	                     </Paragraph>
+	                  </div>
+
+                    <Divider className="!my-6" />
+	                  
+	                  <div>
+	                     <Title level={5} className="!mb-4 !font-medium text-gray-900 flex items-center gap-2">系统流转时间线</Title>
+	                     {timelineItems.length > 0 ? (
+	                         <Timeline items={timelineItems} className="pt-2 pl-1 [&_.ant-timeline-item-content]:ml-6" />
+	                     ) : (
+	                       <Empty description="暂无操作记录流转" className="py-8" />
+	                     )}
+	                  </div>
+	                </div>
+	              )}
+	          </section>
         </div>
       </main>
     </div>

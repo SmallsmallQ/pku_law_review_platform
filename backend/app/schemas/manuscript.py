@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.schemas.job import BackgroundJobResponse
+
 
 class ManuscriptCreateForm(BaseModel):
     """POST /manuscripts 表单字段（与 multipart 一起传）。"""
@@ -63,6 +65,12 @@ class ManuscriptDetailResponse(BaseModel):
 class ManuscriptCreateResponse(BaseModel):
     manuscript: ManuscriptDetailResponse
     version: ManuscriptVersionBrief
+    parse_job: BackgroundJobResponse | None = None
+
+
+class ManuscriptRevisionUploadResponse(BaseModel):
+    version: ManuscriptVersionBrief
+    parse_job: BackgroundJobResponse | None = None
 
 
 class RevisionRequestItem(BaseModel):

@@ -4,8 +4,15 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  ClockCircleOutlined,
+  EditOutlined,
+  FileTextOutlined,
+  RollbackOutlined,
+} from "@ant-design/icons";
+import {
   Alert,
   Button,
+  Card,
   Col,
   Descriptions,
   Form,
@@ -14,7 +21,6 @@ import {
   Select,
   Space,
   Spin,
-  Statistic,
   Table,
   Tag,
   Typography,
@@ -253,62 +259,75 @@ export default function AuthorCenterPage() {
         className="flex-1 mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8"
         aria-label="作者中心"
       >
-        <section className="mb-10">
-          <Row gutter={[24, 24]} align="middle">
-            <Col xs={24} lg={16}>
-              <Text className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8B1538]">
-                Author Center
+        <section className="mb-8 border-b border-[#e5e7eb] pb-6">
+          <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">
+            <div className="max-w-3xl">
+              <Text className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8B1538] mb-2 block">
+                作者服务
               </Text>
-              <Title level={1} className="!mb-3 !mt-3 !font-medium !text-[#1f2937]">
+              <Title level={1} className="!mb-3 !font-medium !text-[#1f2937]">
                 作者中心
               </Title>
-              <Paragraph className="!mb-0 !max-w-3xl !text-[16px] !leading-relaxed !text-[#6b7280]">
-                在这里统一维护作者资料、查看稿件状态、接收退修意见并继续上传修订稿。页面已经开始迁到新的 Ant Design 基座上，后续其他工作台也会沿这套结构推进。
+              <Paragraph className="!mb-0 !text-[15px] !leading-relaxed !text-[#667085]">
+                统一维护作者资料、查看稿件处理进度、接收退修意见，并继续上传修订稿。所有投稿记录与当前状态都会集中展示在本页。
               </Paragraph>
-            </Col>
-            <Col xs={24} lg={8} className="text-left lg:text-right">
-              <Space wrap>
+            </div>
+            <div className="shrink-0">
+              <div className="flex flex-wrap items-center gap-3 xl:justify-end">
                 <Link href="/submit">
-                  <Button type="primary" size="large" className="bg-[#8B1538] hover:!bg-[#A51D45] border-none rounded-sm px-6">
+                  <Button type="primary" size="large" icon={<EditOutlined />} className="bg-[#8B1538] hover:!bg-[#A51D45] border-none shadow-sm">
                     发起新投稿
                   </Button>
                 </Link>
                 <Link href="/guide">
-                  <Button size="large" className="rounded-sm">
+                  <Button size="large">
                     查看投稿须知
                   </Button>
                 </Link>
-              </Space>
-            </Col>
-          </Row>
+              </div>
+            </div>
+          </div>
         </section>
 
-        <Divider className="!border-[#e5e7eb] !mb-10" />
+        <section className="mb-10">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="bg-gray-50 border border-[#e5e7eb] p-5 rounded-[18px] flex items-center justify-between">
+              <div className="pr-4">
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#344054] border border-[#e5e7eb]">
+                  <FileTextOutlined />
+                </div>
+                <Text className="block text-xs text-gray-500 mb-1">稿件总览</Text>
+                <div className="text-[18px] font-medium text-[#1f2937]">我的稿件总数</div>
+                <div className="mt-2 text-sm text-gray-500">含已投稿、处理中与历史记录</div>
+              </div>
+              <Text className="text-[36px] leading-none font-serif-sc text-[#111827]">{total}</Text>
+            </div>
 
-        <section className="mb-12">
-          <Row gutter={[16, 16]}>
-            <Col xs={24} md={8}>
-              <div className="bg-gray-50 border border-[#e5e7eb] p-6 rounded-sm flex items-center justify-between">
-                 <Text className="text-gray-500 font-medium">我的稿件总数</Text>
-                 <Text className="text-3xl font-serif-sc text-gray-900">{total}</Text>
+            <div className="bg-blue-50 border border-blue-100 p-5 rounded-[18px] flex items-center justify-between">
+              <div className="pr-4">
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#2563eb] border border-blue-100">
+                  <ClockCircleOutlined />
+                </div>
+                <Text className="block text-xs text-blue-500 mb-1">当前进度</Text>
+                <div className="text-[18px] font-medium text-[#1d4ed8]">当前处理中</div>
+                <div className="mt-2 text-sm text-blue-700/75">正在审理、待查看结果或待继续办理</div>
               </div>
-            </Col>
-            <Col xs={24} md={8}>
-               <div className="bg-blue-50/50 border border-blue-100 p-6 rounded-sm flex items-center justify-between">
-                 <Text className="text-blue-700 font-medium">当前处理中</Text>
-                 <Text className="text-3xl font-serif-sc text-blue-800">{currentPageReviewing}</Text>
+              <Text className="text-[36px] leading-none font-serif-sc text-[#1d4ed8]">{currentPageReviewing}</Text>
+            </div>
+
+            <div className="bg-red-50 border border-red-100 p-5 rounded-[18px] flex items-center justify-between">
+              <div className="pr-4">
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#8B1538] border border-red-100">
+                  <RollbackOutlined />
+                </div>
+                <Text className="block text-xs text-[#c97a8d] mb-1">退修处理</Text>
+                <div className="text-[18px] font-medium text-[#8B1538]">待退修回传</div>
+                <div className="mt-2 text-sm text-[#8B1538]/75">收到退修要求后请尽快上传修订稿</div>
               </div>
-            </Col>
-            <Col xs={24} md={8}>
-               <div className="bg-red-50/50 border border-red-100 p-6 rounded-sm flex items-center justify-between">
-                 <Text className="text-[#8B1538] font-medium">待退修回传</Text>
-                 <Text className="text-3xl font-serif-sc text-[#8B1538]">{currentPageRevision}</Text>
-              </div>
-            </Col>
-          </Row>
+              <Text className="text-[36px] leading-none font-serif-sc text-[#8B1538]">{currentPageRevision}</Text>
+            </div>
+          </div>
         </section>
-
-        <Divider className="!border-[#e5e7eb] !mb-10" />
 
         <Row gutter={[48, 48]} align="top">
           {/* 左侧主要区域 */}
@@ -466,31 +485,32 @@ export default function AuthorCenterPage() {
           {/* 右侧边栏区 */}
           <Col xs={24} xl={8}>
             <section className="xl:sticky xl:top-6">
-              <div className="bg-gray-50 border border-[#e5e7eb] p-6 rounded-sm mb-8">
-                 <Title level={5} className="!font-medium !text-gray-900 !mt-0 !mb-5 flex items-center justify-between">
-                    账户总览摘要
-                    <span className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">作者级账户</span>
-                 </Title>
-                 <Descriptions column={1} size="small" className="mb-0 text-sm">
+              <Card
+                title="账户总览摘要"
+                extra={<Tag className="!m-0">作者级账户</Tag>}
+                className="mb-8"
+                styles={{ body: { padding: 20 } }}
+              >
+                <Descriptions column={1} size="small" className="mb-0 text-sm">
                   <Descriptions.Item label={<span className="text-gray-500">主邮箱</span>}>{user.email}</Descriptions.Item>
                   <Descriptions.Item label={<span className="text-gray-500">识别姓名</span>}>{user.real_name || "待完善"}</Descriptions.Item>
                   <Descriptions.Item label={<span className="text-gray-500">隶属机构</span>}>{user.institution || "待完善"}</Descriptions.Item>
                   <Descriptions.Item label={<span className="text-gray-500">系统角色</span>}>{user.role}</Descriptions.Item>
                 </Descriptions>
-                
-                <Space direction="vertical" size={12} className="mt-8 flex w-full">
+
+                <Space direction="vertical" size={12} className="mt-6 flex w-full">
                   <Link href="/submit">
-                    <Button block size="large" className="rounded-sm text-[#8B1538] border-[#8B1538] hover:!text-[#A51D45] hover:!border-[#A51D45]">
+                    <Button block size="large">
                       进入投稿入口
                     </Button>
                   </Link>
                   <Link href="/copyright">
-                    <Button block size="large" type="text" className="rounded-sm text-gray-500 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 border-none mt-2">
+                    <Button block size="large" type="text">
                        查阅版权协议副本
                     </Button>
                   </Link>
                 </Space>
-              </div>
+              </Card>
             </section>
           </Col>
         </Row>

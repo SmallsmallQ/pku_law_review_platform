@@ -4,10 +4,11 @@
 import json
 import logging
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -16,11 +17,20 @@ from app.config import settings
 from app.core.deps import RequireReviewStaff, get_current_user_for_download
 from app.core.review_workflow import REVIEW_STAGES, TERMINAL_STATUSES, next_flow_for_action, status_for_stage
 from app.core.storage import resolve_path
-from app.services.docx_to_pdf import convert_to_pdf
 from app.db.base import get_db
-from app.models import CitationIssue, EditorAction, Manuscript, ManuscriptAssignment, ManuscriptVersion, ReviewSubmission, User, ManuscriptParsed, ReviewReport, RevisionTemplate
+from app.models import CitationIssue, EditorAction, Manuscript, ManuscriptAssignment, ManuscriptVersion, ReviewSubmission, User, ManuscriptParsed, ReviewReport
+from app.schemas.job import BackgroundJobResponse, EnqueueJobResponse
 from app.services.citation_checker import check_citations_with_llm
+from app.services.job_queue import (
+    enqueue_ai_review_job,
+    enqueue_preview_pdf_job,
+    enqueue_revision_draft_job,
+    run_job,
+    serialize_job,
+)
 from app.services.llm import chat_completion, is_llm_configured
+from app.services.preview_service import get_cached_preview_path, prepare_pdf_preview
+from app.services.revision_service import generate_revision_draft
 from app.services.review_service import generate_full_ai_report
 
 logger = logging.getLogger(__name__)
@@ -752,15 +762,6 @@ class RevisionDraftResponse(BaseModel):
     draft: str
 
 
-def _get_revision_templates_safe(db: Session):
-    """安全获取退修模板列表，表不存在或查询异常时返回空列表。"""
-    try:
-        return db.query(RevisionTemplate).filter(RevisionTemplate.is_active.is_(True)).order_by(RevisionTemplate.id).all()
-    except Exception as e:
-        logger.warning("获取退修模板失败，将使用空模板: %s", e)
-        return []
-
-
 @router.post("/manuscripts/{id}/revision-draft", response_model=RevisionDraftResponse)
 def editor_revision_draft(
     id: int,
@@ -779,28 +780,7 @@ def editor_revision_draft(
         assignments = _serialize_assignments(db, [id]).get(id, [])
         if not _can_access_manuscript(user, m, assignments):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
-        if not m.current_version_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该稿件尚无版本，无法生成退修意见")
-        report_obj = db.query(ReviewReport).filter(
-            ReviewReport.manuscript_id == id,
-            ReviewReport.version_id == m.current_version_id,
-            ReviewReport.report_type == "preliminary",
-        ).first()
-        report_text, _ = _normalize_report_payload(report_obj)
-        templates = _get_revision_templates_safe(db)
-        template_block = "\n\n".join(
-            f"【{t.name or '模板'}】\n{str(t.content or '')}" for t in templates
-        ) if templates else "（暂无退修模板，请管理员在后台配置）"
-        prompt_instruction = """请根据以下「初审报告」和「本刊退修模板要求」，生成一段给作者的退修意见草稿。
-要求：简洁、专业、直接面向作者；条理清晰；可分点列出主要修改方向；不要简单复述报告全文。"""
-        user_content = f"""## 初审报告\n{report_text[:8000] if report_text else '（暂无初审报告，请先生成 AI 初审报告）'}\n\n## 本刊退修模板（可参考）\n{template_block}\n\n请直接输出退修意见正文，不要加「草稿」等前缀。"""
-        messages = [
-            {"role": "system", "content": prompt_instruction},
-            {"role": "user", "content": user_content},
-        ]
-        # 使用 55 秒超时，避免代理/网关先断开导致 500，超时则返回 502 明确提示
-        draft = chat_completion(messages, max_tokens=1500, timeout=55)
-        draft = (draft or "").strip()
+        draft = generate_revision_draft(db, id)
     except HTTPException:
         raise
     except ValueError as e:
@@ -812,6 +792,52 @@ def editor_revision_draft(
             detail=f"生成退修意见草稿时出错: {e!s}",
         )
     return RevisionDraftResponse(draft=draft)
+
+
+@router.post("/manuscripts/{id}/ai-review/jobs", response_model=EnqueueJobResponse)
+def enqueue_editor_ai_review_job(
+    id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(RequireReviewStaff)],
+):
+    if not is_llm_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="未配置大模型（请在 .env 中设置 DASHSCOPE_API_KEY）",
+        )
+    m = _get_manuscript_or_404(db, id)
+    assignments = _serialize_assignments(db, [id]).get(id, [])
+    if not _can_access_manuscript(user, m, assignments):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
+    if not m.current_version_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该稿件尚无文件版本")
+    job = enqueue_ai_review_job(db, manuscript_id=id, version_id=m.current_version_id, created_by=user.id)
+    if not settings.is_production:
+        run_job(job.id)
+        db.refresh(job)
+    return EnqueueJobResponse(job=BackgroundJobResponse(**serialize_job(job)))
+
+
+@router.post("/manuscripts/{id}/revision-draft/jobs", response_model=EnqueueJobResponse)
+def enqueue_editor_revision_draft_job(
+    id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(RequireReviewStaff)],
+):
+    if not is_llm_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="未配置大模型（请在 .env 中设置 DASHSCOPE_API_KEY）",
+        )
+    m = _get_manuscript_or_404(db, id)
+    assignments = _serialize_assignments(db, [id]).get(id, [])
+    if not _can_access_manuscript(user, m, assignments):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限")
+    job = enqueue_revision_draft_job(db, manuscript_id=id, version_id=m.current_version_id, created_by=user.id)
+    if not settings.is_production:
+        run_job(job.id)
+        db.refresh(job)
+    return EnqueueJobResponse(job=BackgroundJobResponse(**serialize_job(job)))
 
 
 def _get_editor_version_path(id: int, version_id: int, db: Session, user: User):
@@ -859,18 +885,33 @@ def editor_preview_pdf(
     if suffix == ".pdf":
         return FileResponse(path, filename=filename, media_type="application/pdf")
     if suffix in (".docx", ".doc"):
-        pdf_path = convert_to_pdf(path)
-        if pdf_path is None:
+        cached = get_cached_preview_path(id, version_id)
+        if cached and cached.exists():
+            return FileResponse(cached, filename=f"{Path(filename).stem}.pdf", media_type="application/pdf")
+        try:
+            object_key = prepare_pdf_preview(id, version_id, path)
+            cached = resolve_path(object_key)
+            return FileResponse(cached, filename=f"{Path(filename).stem}.pdf", media_type="application/pdf")
+        except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Word 转 PDF 不可用（请确认服务器已安装 LibreOffice），请下载原稿查看。",
+                detail=f"{e!s}，请下载原稿查看。",
             )
-        try:
-            content = pdf_path.read_bytes()
-            return Response(content=content, media_type="application/pdf")
-        finally:
-            try:
-                pdf_path.unlink(missing_ok=True)
-            except OSError:
-                pass
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该格式不支持预览为 PDF")
+
+
+@router.post("/manuscripts/{id}/files/{version_id}/preview-pdf/jobs", response_model=EnqueueJobResponse)
+def enqueue_editor_preview_pdf_job(
+    id: int,
+    version_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(RequireReviewStaff)],
+):
+    path, filename = _get_editor_version_path(id, version_id, db, user)
+    if path.suffix.lower() not in (".docx", ".doc"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="仅 Word 稿件需要生成预览 PDF")
+    job = enqueue_preview_pdf_job(db, manuscript_id=id, version_id=version_id, created_by=user.id)
+    if not settings.is_production:
+        run_job(job.id)
+        db.refresh(job)
+    return EnqueueJobResponse(job=BackgroundJobResponse(**serialize_job(job)))

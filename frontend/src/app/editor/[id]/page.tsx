@@ -1,8 +1,18 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  AuditOutlined,
+  CheckCircleFilled,
+  ClockCircleOutlined,
+  CloseCircleFilled,
+  FileDoneOutlined,
+  FileSearchOutlined,
+  SafetyCertificateOutlined,
+  SendOutlined,
+  SyncOutlined,
+} from "@ant-design/icons";
 import {
   Alert,
   Button,
@@ -20,6 +30,7 @@ import {
   Space,
   Splitter,
   Spin,
+  Steps,
   Tag,
   Typography,
 } from "antd";
@@ -28,7 +39,7 @@ import HeaderBar from "@/components/HeaderBar";
 import TypewriterMarkdown from "@/components/ui/TypewriterMarkdown";
 import CitationChecker from "@/components/CitationChecker";
 import { REVIEW_STAGE_MAP, REVIEW_STAFF_ROLES, ROLE_MAP, STATUS_MAP } from "@/lib/constants";
-import { editorApi, type EditorManuscriptDetail, type ReviewSubmissionItem } from "@/services/api";
+import { editorApi, waitForJob, type EditorManuscriptDetail, type ReviewSubmissionItem } from "@/services/api";
 
 const REVIEW_RECOMMENDATION_MAP: Record<string, string> = {
   accept: "建议通过",
@@ -37,7 +48,27 @@ const REVIEW_RECOMMENDATION_MAP: Record<string, string> = {
   reject: "建议退稿",
 };
 
-const { Paragraph, Text, Title } = Typography;
+const FLOW_STEP_INDEX: Record<string, number> = {
+  submitted: 0,
+  parsing: 0,
+  under_review: 0,
+  internal_review: 1,
+  external_review: 2,
+  final_review: 3,
+  revision_requested: 3,
+  revised_submitted: 3,
+  final_submitted: 4,
+  accepted: 4,
+  rejected: 4,
+};
+
+const STAGE_TO_STEP_INDEX: Record<string, number> = {
+  internal: 1,
+  external: 2,
+  final: 3,
+};
+
+const { Paragraph, Text } = Typography;
 
 export default function EditorManuscriptDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -77,6 +108,7 @@ export default function EditorManuscriptDetailPage() {
   // 退修意见草稿
   const [revisionDraftLoading, setRevisionDraftLoading] = useState(false);
   const [revisionDraftError, setRevisionDraftError] = useState<string | null>(null);
+  const [jobMessage, setJobMessage] = useState<string | null>(null);
   
   const [reviewSubmitLoading, setReviewSubmitLoading] = useState(false);
   const [reviewRecommendation, setReviewRecommendation] = useState<string>("major_revision");
@@ -122,11 +154,18 @@ export default function EditorManuscriptDetailPage() {
     setAiError(null);
     setAiReport(null);
     try {
-      const res = await editorApi.generateAiReview(Number(id));
-      setAiReport(res);
+      setJobMessage("已提交 AI 初审任务，正在生成报告…");
+      const enqueueRes = await editorApi.enqueueAiReviewJob(Number(id));
+      const job = await waitForJob<{ report_id?: number; model?: string }>(enqueueRes.job.id, { timeoutMs: 180000 });
+      if (job.status !== "succeeded") {
+        throw new Error(job.error || "AI 初审任务执行失败");
+      }
+      await load();
       setReportJustGenerated(true);
+      setJobMessage("AI 初审报告已生成");
     } catch (e) {
       setAiError(e instanceof Error ? e.message : "生成失败");
+      setJobMessage(null);
     } finally {
       setAiReviewLoading(false);
     }
@@ -166,10 +205,17 @@ export default function EditorManuscriptDetailPage() {
     setRevisionDraftError(null);
     setRevisionDraftLoading(true);
     try {
-      const res = await editorApi.revisionDraft(Number(id));
-      setRevisionComment(res.draft);
+      setJobMessage("已提交退修意见草稿任务，正在生成…");
+      const enqueueRes = await editorApi.enqueueRevisionDraftJob(Number(id));
+      const job = await waitForJob<{ draft?: string }>(enqueueRes.job.id, { timeoutMs: 180000 });
+      if (job.status !== "succeeded") {
+        throw new Error(job.error || "退修意见草稿生成失败");
+      }
+      setRevisionComment(String(job.result?.draft || ""));
+      setJobMessage("退修意见草稿已生成，可继续修改");
     } catch (e) {
       setRevisionDraftError(e instanceof Error ? e.message : "生成失败");
+      setJobMessage(null);
     } finally {
       setRevisionDraftLoading(false);
     }
@@ -201,11 +247,140 @@ export default function EditorManuscriptDetailPage() {
   const currentStage = manuscript?.current_review_stage as string | undefined;
   const currentStageAssignment = assignments.find((item) => Number(item.reviewer_id) === user?.id && String(item.review_stage) === currentStage);
   const currentUserReview = reviewSubmissions.find((item) => item.reviewer_id === user?.id && item.review_stage === currentStage);
+  const flowCurrentIndex = currentStage ? STAGE_TO_STEP_INDEX[currentStage] ?? (FLOW_STEP_INDEX[status ?? ""] ?? 0) : (FLOW_STEP_INDEX[status ?? ""] ?? 0);
+  const resultStepIcon =
+    status === "accepted"
+      ? <CheckCircleFilled className="text-[#16a34a]" />
+      : status === "rejected"
+        ? <CloseCircleFilled className="text-[#dc2626]" />
+        : status === "final_submitted"
+          ? <FileDoneOutlined className="text-[#2563eb]" />
+          : status === "revised_submitted"
+            ? <SyncOutlined className="text-[#d97706]" />
+            : <ClockCircleOutlined className="text-[#98a2b3]" />;
+  const flowItems = [
+    {
+      key: "submitted",
+      title: "投稿入库",
+      subTitle: "作者提交",
+      description: status === "draft" ? "稿件仍处于草稿状态，尚未进入正式编审流程。" : "稿件已进入系统，等待编辑部启动流程。",
+      icon: <SendOutlined />,
+      status: flowCurrentIndex > 0 ? "finish" : (status === "draft" ? "process" : "finish"),
+    },
+    {
+      key: "internal",
+      title: "内审",
+      subTitle: currentStage === "internal" ? "当前阶段" : "阶段一",
+      description: currentStage === "internal"
+        ? "当前由内审节点处理，可提交内审结论或发起退修。"
+        : "编辑或内审人员进行初步判断与分流。",
+      icon: <AuditOutlined />,
+      status: currentStage === "internal"
+        ? (status === "revision_requested" ? "error" : "process")
+        : flowCurrentIndex > 1
+          ? "finish"
+          : "wait",
+    },
+    {
+      key: "external",
+      title: "外审",
+      subTitle: currentStage === "external" ? "当前阶段" : "阶段二",
+      description: currentStage === "external"
+        ? "当前处于外审评议阶段，可提交外审结论或继续推进。"
+        : "稿件进入专家外审与复审流转。",
+      icon: <FileSearchOutlined />,
+      status: currentStage === "external"
+        ? (status === "revision_requested" ? "error" : "process")
+        : flowCurrentIndex > 2
+          ? "finish"
+          : "wait",
+    },
+    {
+      key: "final",
+      title: "终审",
+      subTitle: currentStage === "final" ? "当前阶段" : "阶段三",
+      description: status === "revision_requested"
+        ? "当前流程在终审节点发出退修，等待作者回传修订稿。"
+        : currentStage === "final"
+          ? "当前由终审节点处理，可提交成稿或直接录用。"
+          : "终审阶段综合前序意见做最终处理。",
+      icon: <SafetyCertificateOutlined />,
+      status: currentStage === "final"
+        ? (status === "revision_requested" ? "error" : "process")
+        : flowCurrentIndex > 3
+          ? "finish"
+          : "wait",
+    },
+    {
+      key: "result",
+      title: "结果归档",
+      subTitle:
+        status === "accepted"
+          ? "已录用"
+          : status === "final_submitted"
+            ? "已提交成稿"
+            : status === "rejected"
+              ? "已退稿"
+              : status === "revised_submitted"
+                ? "修订稿已回传"
+                : "待完成",
+      description:
+        status === "accepted"
+          ? "稿件已完成录用处理。"
+          : status === "final_submitted"
+            ? "终审成稿已提交，进入归档环节。"
+            : status === "rejected"
+              ? "稿件已终止流程。"
+              : status === "revised_submitted"
+                ? "作者已提交修订稿，等待当前节点继续处理。"
+                : "完成终审决定后将在此显示最终处理结果。",
+      icon: resultStepIcon,
+      status:
+        status === "rejected"
+          ? "error"
+          : ["accepted", "final_submitted"].includes(status ?? "")
+            ? "finish"
+            : status === "revised_submitted"
+              ? "process"
+              : "wait",
+    },
+  ] as const;
 
   const jumpToAiDetect = useCallback(() => {
     if (!id) return;
     router.push(`/ai-detect?source=editor&manuscriptId=${id}`);
   }, [id, router]);
+
+  const currentStageAction = availableActions.find((action) => action.startsWith("submit_"));
+  const helperActions = [
+    { key: "ai_review", label: "生成 AI 初审报告", onClick: runAiReview, type: "primary" as const, loading: aiReviewLoading },
+    { key: "ai_detect", label: "前往 AI 检测", onClick: jumpToAiDetect },
+    { key: "ai_assistant", label: "AI 助手", onClick: () => setAiAssistantOpen(true) },
+  ];
+  const stageActions = [
+    currentStageAction === "submit_internal_review"
+      ? { key: "submit_internal_review", label: "提交内审", onClick: () => runAction("submit_internal_review"), type: "primary" as const }
+      : null,
+    currentStageAction === "submit_external_review"
+      ? { key: "submit_external_review", label: "提交外审", onClick: () => runAction("submit_external_review"), type: "primary" as const }
+      : null,
+    currentStageAction === "submit_final_submission"
+      ? { key: "submit_final_submission", label: "提交成稿", onClick: () => runAction("submit_final_submission"), type: "primary" as const }
+      : null,
+  ].filter(Boolean);
+  const interventionActions = [
+    availableActions.includes("revision_request")
+      ? { key: "revision_request", label: "发起退修", onClick: () => { setRevisionModalOpen(true); setRevisionDraftError(null); } }
+      : null,
+    availableActions.includes("reject")
+      ? { key: "reject", label: "退稿", onClick: () => setRejectConfirmOpen(true), danger: true }
+      : null,
+  ].filter(Boolean);
+  const terminalActions = [
+    availableActions.includes("accept")
+      ? { key: "accept", label: "录用", onClick: () => runAction("accept"), type: "primary" as const }
+      : null,
+  ].filter(Boolean);
 
   const submitStructuredReview = useCallback(async () => {
     if (!id || !currentStage) return;
@@ -237,6 +412,12 @@ export default function EditorManuscriptDetailPage() {
     const t = setTimeout(() => setSuccessMessage(null), 3000);
     return () => clearTimeout(t);
   }, [successMessage]);
+
+  useEffect(() => {
+    if (!jobMessage) return;
+    const t = setTimeout(() => setJobMessage(null), 4000);
+    return () => clearTimeout(t);
+  }, [jobMessage]);
 
   useEffect(() => {
     setReviewRecommendation(currentUserReview?.recommendation ?? "major_revision");
@@ -275,6 +456,12 @@ export default function EditorManuscriptDetailPage() {
       setPdfPreviewUrl("");
     }
     try {
+      setJobMessage("已提交 PDF 预览任务，正在生成版式预览…");
+      const enqueueRes = await editorApi.enqueuePreviewPdfJob(Number(id), versionId);
+      const job = await waitForJob<{ preview_path?: string }>(enqueueRes.job.id, { timeoutMs: 180000 });
+      if (job.status !== "succeeded") {
+        throw new Error(job.error || "生成 PDF 失败");
+      }
       const url = editorApi.previewPdfUrl(Number(id), versionId);
       const res = await fetch(url);
       if (!res.ok) {
@@ -285,8 +472,10 @@ export default function EditorManuscriptDetailPage() {
       const objectUrl = URL.createObjectURL(blob);
       pdfPreviewObjectUrlRef.current = objectUrl;
       setPdfPreviewUrl(objectUrl);
+      setJobMessage("PDF 预览已生成");
     } catch (e) {
       setPdfPreviewError(e instanceof Error ? e.message : "生成 PDF 预览失败");
+      setJobMessage(null);
     } finally {
       setPdfPreviewLoading(false);
     }
@@ -376,6 +565,7 @@ export default function EditorManuscriptDetailPage() {
       <main className="mx-auto w-full px-4 py-6 sm:px-6 lg:px-8" style={{ height: "calc(100vh - 64px)" }}>
         <Space direction="vertical" size={16} className="flex w-full h-full">
           {successMessage && <Alert message={successMessage} type="success" showIcon />}
+          {jobMessage && <Alert message={jobMessage} type="info" showIcon />}
 
           {loading && (
             <Card styles={{ body: { padding: 28 } }}>
@@ -461,46 +651,93 @@ export default function EditorManuscriptDetailPage() {
                     </Card>
                   )}
 
-                  <Card title="流程操作">
+                  <Card title="流程进度与操作">
                     <Space direction="vertical" size={16} className="flex w-full">
+                      <div className="rounded border border-[#e8eef8] bg-[#fafcff] p-4">
+                        <div className="mb-3">
+                          <Text strong className="text-sm text-[#1d4ed8]">流程进度</Text>
+                          <Text type="secondary" className="block mt-1 text-xs">
+                            当前稿件状态：{STATUS_MAP[status ?? ""] ?? status ?? "—"}
+                            {currentStage ? ` · ${REVIEW_STAGE_MAP[currentStage] ?? currentStage}` : ""}
+                          </Text>
+                        </div>
+                        <Steps
+                          orientation="vertical"
+                          size="small"
+                          variant="outlined"
+                          current={flowCurrentIndex}
+                          items={flowItems}
+                        />
+                      </div>
+
                       {aiReviewLoading && <Alert message="正在生成 AI 初审报告…" type="info" showIcon />}
-                      <Space wrap size="small">
-                        <Button type="primary" onClick={runAiReview} loading={aiReviewLoading}>
-                          生成 AI 初审报告
-                        </Button>
-                        <Button onClick={jumpToAiDetect}>一键跳转 AI 率审核</Button>
-                        <Button onClick={() => setAiAssistantOpen(true)}>AI 助手</Button>
-                        {availableActions.includes("revision_request") && (
-                          <Button onClick={() => { setRevisionModalOpen(true); setRevisionDraftError(null); }}>
-                            退修
-                          </Button>
+                      <Text type="secondary" className="text-xs">
+                        下方仅展示当前节点可执行的操作；推进流程前请先确认本阶段审稿意见已保存。
+                      </Text>
+                      <div className="space-y-4">
+                        <div className="rounded border border-[#eef2f6] bg-white p-4">
+                          <Text strong className="text-xs text-[#475467]">辅助工具</Text>
+                          <Space wrap size="small" className="mt-3">
+                            {helperActions.map((action) => (
+                              <Button
+                                key={action.key}
+                                type={action.type}
+                                onClick={action.onClick}
+                                loading={action.loading}
+                              >
+                                {action.label}
+                              </Button>
+                            ))}
+                          </Space>
+                        </div>
+
+                        {stageActions.length > 0 && (
+                          <div className="rounded border border-[#dbe7ff] bg-[#f8fbff] p-4">
+                            <Text strong className="text-xs text-[#1d4ed8]">
+                              当前阶段推进
+                              {currentStage ? ` · ${REVIEW_STAGE_MAP[currentStage] ?? currentStage}` : ""}
+                            </Text>
+                            <Space wrap size="small" className="mt-3">
+                              {stageActions.map((action) => (
+                                <Button key={action.key} type={action.type} onClick={action.onClick} disabled={actionLoading}>
+                                  {action.label}
+                                </Button>
+                              ))}
+                            </Space>
+                          </div>
                         )}
-                        {availableActions.includes("reject") && (
-                          <Button danger onClick={() => setRejectConfirmOpen(true)} disabled={actionLoading}>
-                            退稿
-                          </Button>
+
+                        {interventionActions.length > 0 && (
+                          <div className="rounded border border-[#fde7c2] bg-[#fffaf0] p-4">
+                            <Text strong className="text-xs text-[#b45309]">流程干预</Text>
+                            <Space wrap size="small" className="mt-3">
+                              {interventionActions.map((action) => (
+                                <Button
+                                  key={action.key}
+                                  danger={action.danger}
+                                  onClick={action.onClick}
+                                  disabled={actionLoading}
+                                >
+                                  {action.label}
+                                </Button>
+                              ))}
+                            </Space>
+                          </div>
                         )}
-                        {availableActions.includes("submit_internal_review") && (
-                          <Button type="primary" onClick={() => runAction("submit_internal_review")} disabled={actionLoading}>
-                            提交内审
-                          </Button>
+
+                        {terminalActions.length > 0 && (
+                          <div className="rounded border border-[#d9f2e3] bg-[#f6fef9] p-4">
+                            <Text strong className="text-xs text-[#15803d]">终局处理</Text>
+                            <Space wrap size="small" className="mt-3">
+                              {terminalActions.map((action) => (
+                                <Button key={action.key} type={action.type} onClick={action.onClick} disabled={actionLoading}>
+                                  {action.label}
+                                </Button>
+                              ))}
+                            </Space>
+                          </div>
                         )}
-                        {availableActions.includes("submit_external_review") && (
-                          <Button type="primary" onClick={() => runAction("submit_external_review")} disabled={actionLoading}>
-                            提交外审
-                          </Button>
-                        )}
-                        {availableActions.includes("submit_final_submission") && (
-                          <Button type="primary" onClick={() => runAction("submit_final_submission")} disabled={actionLoading}>
-                            提交成稿
-                          </Button>
-                        )}
-                        {availableActions.includes("accept") && (
-                          <Button type="primary" onClick={() => runAction("accept")} disabled={actionLoading}>
-                            录用
-                          </Button>
-                        )}
-                      </Space>
+                      </div>
                     </Space>
                   </Card>
 
