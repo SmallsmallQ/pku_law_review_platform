@@ -259,18 +259,18 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="bg-white w-full max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8 space-y-10 min-h-screen text-[#1d1d1f]">
+    <div className="bg-white w-full min-w-0 max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8 space-y-10 min-h-screen text-[#1d1d1f] break-normal">
       {/* Header Section */}
       <section className="pb-6 border-b border-[#e5e7eb]">
-        <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-6">
-          <div className="min-w-0 flex-1 max-w-3xl">
-            <Text className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8B1538] mb-2 block">
+        <div className="flex w-full flex-col xl:flex-row xl:items-start justify-between gap-6">
+          <div className="w-full min-w-0 flex-1 max-w-3xl break-normal">
+            <Text className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#8B1538] mb-2 block break-normal whitespace-normal">
               Admin Console
             </Text>
-            <Title level={1} className="!mb-3 !font-medium !text-[#1f2937]">
+            <Title level={1} className="!mb-3 !font-medium !text-[#1f2937] !break-normal !whitespace-normal">
               管理仪表盘
             </Title>
-            <Paragraph className="!mb-0 !text-[15px] !leading-relaxed !text-[#6b7280]">
+            <Paragraph className="!mb-0 !text-[15px] !leading-relaxed !text-[#6b7280] !break-normal !whitespace-normal">
               统一查看稿件积压、用户结构、栏目配置和最近处理记录。保留现有业务逻辑，后台首页同样回归无卡片的扁平化结构。
             </Paragraph>
           </div>
